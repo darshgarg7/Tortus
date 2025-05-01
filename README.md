@@ -1,6 +1,6 @@
-# TSG-RAG v3: Toroidal Semantic Graph for Scalable, Explainable GenAI Retrieval
+Toroidal Semantic Graph for Scalable, Explainable GenAI Retrieval
 
-**TSG-RAG v3** is a cutting-edge architecture for Retrieval-Augmented Generation (RAG) that fuses:
+**TSG-RAG** is a cutting-edge architecture for Retrieval-Augmented Generation (RAG) that fuses:
 - **A semantic graph embedded in a soft toroidal manifold**
 - **Multi-hop LLM reasoning with dynamic traversal**
 - **Developer-accessible GraphQL portals for querying knowledge**
