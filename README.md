@@ -47,12 +47,12 @@ The modern knowledge base should be **navigable like a conceptual space**, **que
 flowchart TD
     A[User / LLM Query] --> B[Embedding + Intent Parsing]
     B --> C[Top-K Semantic ANN Pruning]
-    C --> D[Subgraph Selector (Density-Aware)]
+    C --> D[Subgraph Selector: Density-Aware]
     D --> E[GraphQL Query Abstraction Layer]
     E --> F[Federated Gateway]
-    F --> G[Local Subgraph Traversal + Portal Hops]
+    F --> G[Local Subgraph Traversal & Portal Hops]
     G --> H[Multi-Hop LLM Reasoning Agent]
-    H --> I[Final Answer + Reasoning Path (Graph of Thought)]
+    H --> I[Final Answer & Reasoning Path: Graph of Thought]
 ```
 
 ---
