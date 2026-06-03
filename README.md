@@ -299,8 +299,6 @@ Created by Darsh Garg.
 
 - GitHub: `darshgarg7`
 - Email: `darsh.garg@gmail.com`
-
 ## License
 
 MIT. Use freely for educational, research, and portfolio purposes.
-
