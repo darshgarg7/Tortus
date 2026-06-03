@@ -1,181 +1,305 @@
-# TSG-RAG v3: Toroidal Semantic Graph for Scalable, Explainable GenAI Retrieval
+# Tortus: Toroidal Semantic Graph Retrieval
 
-**TSG-RAG v3** is a cutting-edge architecture for Retrieval-Augmented Generation (RAG) that fuses:
-- **A semantic graph embedded in a soft toroidal manifold**
-- **Multi-hop LLM reasoning with dynamic traversal**
-- **Developer-accessible GraphQL portals for querying knowledge**
+Tortus is a design-stage retrieval architecture for explainable, multi-hop RAG over large and federated knowledge bases.
 
-It is designed to overcome the limits of traditional RAG by enabling structured, transparent, and scalable access to interconnected information.
+The core idea is simple: instead of treating knowledge as a flat set of embedded chunks, Tortus models it as a typed semantic graph embedded onto a soft toroidal manifold. Queries start with vector retrieval, then traverse concept edges, cross domain portals when needed, and return both an answer and the path that produced it.
 
-> "Query concepts, not just chunks. Navigate ideas, not just indices."
+> Query concepts, not just chunks. Return reasoning paths, not just citations.
 
----
+## Status
 
-## 🧠 1. System Vision
+This repository is currently an architecture/specification draft. There is no implementation yet.
 
-The modern knowledge base should be **navigable like a conceptual space**, **queryable like an API**, and **interpretable like thought**.
+The intended MVP is a local prototype that validates whether toroidal graph locality plus typed traversal improves multi-hop retrieval quality, explainability, and shard affinity compared with vector-only RAG, hybrid sparse+dense retrieval, and conventional GraphRAG baselines.
 
-**TSG-RAG** is built for:
+## Problem
 
-- Scalable knowledge access using geometric graph structure
-- Federated subgraphs connected via **dynamic portal edges**
-- Rich **LLM-driven traversal** for reasoning and synthesis
-- **Developer transparency** through GraphQL queries over concepts
+Most production RAG systems are strong at retrieving nearby text and weak at preserving relationships between ideas. That creates recurring failures:
 
----
+| Failure mode | What happens | Why it matters |
+| --- | --- | --- |
+| Chunk blindness | The retriever finds relevant fragments but misses the conceptual path between them. | Answers become locally plausible and globally incomplete. |
+| Boundary artifacts | Clusters, domains, and shards create artificial edges in the knowledge space. | Cross-domain questions degrade exactly where synthesis is needed most. |
+| Weak provenance | Citations point to documents, but not to the reasoning path through concepts. | Users cannot audit why the system connected one fact to another. |
+| Prompt-hidden retrieval logic | Traversal policies live inside prompts or app code. | Developers cannot inspect, tune, or constrain retrieval behavior cleanly. |
+| Cost drift | Agentic search keeps expanding until a budget or timeout stops it. | Latency and LLM spend become difficult to predict. |
 
-## 🧭 2. Key Innovations
+Tortus targets knowledge systems where the answer depends on a path across concepts: engineering design history, policy reasoning, incident analysis, compliance research, product knowledge, and technical support.
 
-| Feature | Description |
-|--------|-------------|
-| **Soft Toroidal Topology** | Semantic graph embedded in a non-Euclidean torus (no hard borders, smooth cyclic continuity) to ensure global reachability and efficient clustering. |
-| **Semantic Asymmetry Correction** | Directional weight tuning to correct retrieval imbalances (e.g., answer → question edges penalized less than the reverse). |
-| **Density-Aware Radius** | Adaptive neighborhood radii for traversal, compensating for sparse vs. dense regions. |
-| **Overlapping Subgraphs** | Nodes belong to multiple conceptual domains; federation is handled with weighted membership and edge blending. |
-| **Approximate Traversal** | Two-phase: top-k vector pruning, then local edge-biased DFS/BFS search (with recency, relevance, or node entropy weighting). |
-| **Portal Edge Hops** | Cross-subgraph jumps based on LLM context or explicit GraphQL directives. |
-| **GraphQL Semantic Access** | Developers query abstract ideas directly; the system handles traversal, federation, and LLM integration under the hood. |
-| **Federation Gateway** | GraphQL schema federation layer unifying subgraphs and handling failover, retries, and partial answers. |
-| **Tortus-Based Sharding** | Topology-aware data partitioning using toroidal locality — improves query affinity and cache efficiency. |
-| **Hybrid + Lazy Storage** | Cold/partial nodes are fetched or synthesized on-demand; hot paths remain active via usage-based materialization. |
+## Core Hypothesis
 
----
+A semantic graph embedded on a toroidal coordinate space can make retrieval more navigable and operationally scalable by combining:
 
-## 🔁 3. Architecture Overview (Mermaid Diagram)
+- vector search for fast candidate generation
+- typed graph edges for explainable multi-hop traversal
+- toroidal locality for wraparound neighborhoods and topology-aware sharding
+- GraphQL directives for developer-controlled traversal behavior
+- budget-aware LLM synthesis over explicit evidence paths
+
+The torus is not treated as magic. It is a systems hypothesis that should be validated against measurable baselines.
+
+## Non-Goals
+
+Tortus is not trying to be:
+
+- a general replacement for vector databases
+- a fully autonomous research agent
+- a knowledge graph ontology project
+- a prompt-only retrieval strategy
+- a claim that toroidal topology is always better than Euclidean or hyperbolic layouts
+
+The goal is narrower: test whether topology-aware semantic graph traversal gives better answers for multi-hop, cross-domain retrieval problems where provenance and cost control matter.
+
+## Why a Torus?
+
+Traditional vector and graph layouts often have boundary effects: points near the edge of a cluster or partition can be artificially far from related concepts. A toroidal space wraps both axes, so neighborhoods do not terminate at hard borders.
+
+In Tortus, toroidal coordinates are used for three concrete jobs:
+
+| Job | Expected benefit | What must be proven |
+| --- | --- | --- |
+| Neighborhood traversal | Smooth cyclic continuity around dense concept regions. | Better multi-hop recall at equal latency. |
+| Sharding | Locality-preserving partitioning without hard semantic edges. | Higher shard affinity and cache hit rate. |
+| Federation | Portal hops between overlapping subgraphs without treating every domain boundary as a cliff. | Better cross-domain path quality under budget. |
+
+If the toroidal embedding does not beat simpler layouts in evaluation, it should be replaced. The architecture is designed to make that comparison explicit.
+
+## Competitive Context
+
+Tortus sits between several existing retrieval patterns:
+
+| Pattern | Strength | Limitation Tortus targets |
+| --- | --- | --- |
+| Vector-only RAG | Fast semantic recall over large corpora. | Weak relationship modeling and shallow provenance. |
+| Hybrid sparse+dense retrieval | Strong lexical plus semantic matching. | Still returns ranked items, not concept paths. |
+| Knowledge graphs | Explicit relationships and auditability. | Often brittle, expensive to build, and disconnected from embedding-based recall. |
+| GraphRAG | Better global summaries and community-level context. | Can blur source-level paths and make query-time control indirect. |
+| Agentic search | Flexible multi-step exploration. | Harder to bound, inspect, reproduce, and optimize. |
+
+Tortus attempts to combine the useful parts: fast candidate generation, explicit relationships, bounded traversal, and source-backed answer synthesis.
+
+## Architecture
 
 ```mermaid
 flowchart TD
-    A[User / LLM Query] --> B[Embedding + Intent Parsing]
-    B --> C[Top-K Semantic ANN Pruning]
-    C --> D[Subgraph Selector (Density-Aware)]
-    D --> E[GraphQL Query Abstraction Layer]
-    E --> F[Federated Gateway]
-    F --> G[Local Subgraph Traversal + Portal Hops]
-    G --> H[Multi-Hop LLM Reasoning Agent]
-    H --> I[Final Answer + Reasoning Path (Graph of Thought)]
+    A[Documents, APIs, tickets, repos] --> B[Ingestion and normalization]
+    B --> C[Concept extraction]
+    C --> D[Typed semantic graph]
+    D --> E[Toroidal coordinate embedding]
+    E --> F[ANN index]
+    E --> G[Graph store]
+    G --> H[Topology-aware shards]
+
+    I[User or LLM query] --> J[Intent parsing]
+    J --> K[Top-k vector seeding]
+    K --> L[Density-aware graph traversal]
+    L --> M[Portal hop planner]
+    M --> N[Evidence-constrained synthesis]
+    N --> O[Answer plus reasoning path]
+
+    P[GraphQL API] --> J
+    P --> L
+    P --> M
 ```
 
----
+## Data Model
 
-## 🔌 4. GraphQL Developer API
+Tortus separates semantic content from traversal control.
 
-A declarative, dev-friendly interface that abstracts traversal logic and exposes semantic concepts.
+| Entity | Purpose |
+| --- | --- |
+| `ConceptNode` | A concept, entity, claim, chunk, document section, API, decision, or event. |
+| `SemanticEdge` | A typed relationship such as `supports`, `contradicts`, `depends_on`, `caused_by`, `implements`, or `related_to`. |
+| `SubgraphMembership` | Weighted membership in one or more domains, teams, products, sources, or tenants. |
+| `PortalEdge` | A controlled cross-subgraph jump used when a query needs domain switching. |
+| `EvidenceSpan` | A source-backed span attached to a node or edge for traceability. |
+| `TraversalPolicy` | Runtime constraints such as hop budget, latency budget, personalization, freshness, or locality. |
 
-### Example Query
+Example node shape:
+
+```json
+{
+  "id": "concept:llm-bias-evaluation",
+  "label": "LLM bias evaluation",
+  "kind": "concept",
+  "embeddingRef": "emb:9f31",
+  "torus": { "theta": 1.84, "phi": 5.12 },
+  "memberships": [
+    { "subgraph": "ai-governance", "weight": 0.82 },
+    { "subgraph": "model-evaluation", "weight": 0.64 }
+  ],
+  "evidence": [
+    { "uri": "docs://eval/bias.md", "span": [120, 184] }
+  ]
+}
+```
+
+## Query API
+
+GraphQL is used as a developer-facing control plane for retrieval. It does not replace the graph store; it gives callers a typed way to constrain traversal.
+
 ```graphql
-query {
-  concept(id: "Ethical AI Guidelines")
-    @semanticGroup("Governance")
-    @portalPreference("RecentCaseLaw")
+query ExplainConcept($id: ID!) {
+  concept(id: $id)
+    @semanticGroup(name: "Governance")
+    @portalPreference(type: "RecentCaseLaw")
     @failoverPlan(level: 1)
     @explainHops
   {
-    node
+    id
+    label
     confidence
-    reasoningPath
+    answer
+    reasoningPath {
+      from
+      to
+      edgeType
+      weight
+      evidence {
+        uri
+        span
+      }
+    }
   }
 }
 ```
 
-### Supported Directives
+Planned directives:
 
 | Directive | Purpose |
-|----------|---------|
-| `@semanticGroup(name)` | Target domain-specific subgraphs |
-| `@failoverPlan(level)` | Retry on federation failure |
-| `@portalPreference(type)` | Influence portal edge selection |
-| `@explainHops` | Return trace of graph traversal |
-| `@noPersonalization` | Disable user-context personalization |
-| `@localOnly` | Restrict to current subgraph |
+| --- | --- |
+| `@semanticGroup(name: String!)` | Prefer a domain-specific subgraph. |
+| `@portalPreference(type: String!)` | Bias cross-subgraph portal selection. |
+| `@failoverPlan(level: Int!)` | Allow bounded retries or partial answers. |
+| `@explainHops` | Return the traversal path and evidence spans. |
+| `@noPersonalization` | Disable user-context personalization. |
+| `@localOnly` | Prevent portal hops outside the selected subgraph. |
+| `@budget(maxHops: Int, maxMs: Int, maxTokens: Int)` | Bound latency, depth, and LLM cost. |
 
----
+## Retrieval Algorithm
 
-## 🔎 5. Multi-Hop Reasoning
+At query time, Tortus follows a bounded retrieval plan:
 
-TSG-RAG uses an embedded **LLM agent** to navigate graph nodes based on context, semantic proximity, and query intent.
+1. Parse query intent, constraints, and GraphQL directives.
+2. Generate seed candidates with ANN vector search.
+3. Map candidates to graph nodes and toroidal coordinates.
+4. Estimate local density around each seed.
+5. Expand through typed edges using a density-aware radius.
+6. Score frontier nodes with semantic similarity, edge weight, freshness, evidence quality, and policy constraints.
+7. Trigger portal hops when the frontier has low coverage or the query implies domain switching.
+8. Select evidence paths under hop, latency, and token budgets.
+9. Synthesize an answer only from selected evidence.
+10. Return the answer, confidence, path, and degraded-mode warnings when applicable.
 
-### Key Behaviors:
-- Chooses edge traversal based on prompt grounding
-- Uses retrieved paths to synthesize structured "graphs of thought"
-- Selects portals adaptively based on domain switching or concept gaps
+Traversal score sketch:
 
 ```text
-Example Path:
-    (Node A: LLM Bias) 
-    → (Node B: Data Ethics) 
-    → (Node C: Regulation EU-2024)
+score(next) =
+  semantic_similarity(query, next)
+  + edge_weight(current, next)
+  + evidence_quality(next)
+  + freshness_bias(next)
+  - traversal_cost(next)
+  - uncertainty_penalty(next)
 ```
 
-Each hop contributes structured reasoning with justification and traceability.
+The exact scoring function is intentionally replaceable. The MVP should make retrieval policies easy to compare rather than hard-coding one strategy.
 
----
+## Evaluation Plan
 
-## 🗄️ 6. Storage & Indexing
+Tortus should be judged by evidence, not novelty language.
 
-| Layer | Method |
-|-------|--------|
-| **Indexing** | Vector ANN (e.g., Faiss/HNSW) with edge-masking for early pruning |
-| **Sharding** | Toroidal coordinate hashing (Tortus) — retains proximity |
-| **Caching** | Subgraph-level TTL + popularity-based LRU |
-| **Lazy Loading** | Low-priority nodes instantiated on request |
-| **Portal Expansion** | Dynamically trigger cold hops on sparse queries |
+| Dimension | Metrics |
+| --- | --- |
+| Retrieval quality | recall@k, multi-hop path recall, answer faithfulness, contradiction rate |
+| Path quality | hop precision, evidence coverage, path minimality, human audit score |
+| System performance | p50/p95 latency, shard fanout, cache hit rate, index update cost |
+| Cost control | tokens per answered query, LLM calls per query, timeout rate |
+| Federation | cross-subgraph success rate, partial-answer quality, failover rate |
 
----
+Required baselines:
 
-## ⚙️ 7. Infrastructure Scalability
+- vector-only RAG
+- BM25 plus dense hybrid retrieval
+- conventional knowledge graph lookup
+- GraphRAG-style community summaries
+- agentic search with tool calls
 
-Built for **cloud-native**, **multi-tenant**, and **LLM-budget-aware** deployments:
+The project is successful only if it can show a measurable improvement for questions that require concept paths, while staying competitive on latency and cost.
 
-- **Federated Subgraphs**: Decoupled schema services with edge gateways
-- **Latency Budgets**: Hops/time trade-offs controlled via directive plans
-- **Multi-agent Traversal**: Multiple path hypotheses in parallel
-- **LLM Cost Guardrails**: Prompt pruning, edge batching, and budget limits
-- **Observability**: Hop logs, node entropy, confidence tracking, GraphQL metrics
+## MVP Scope
 
----
+The first implementation should be small enough to finish and rigorous enough to learn from.
 
-## ❤️ 8. Human-Centered Design
+| Phase | Deliverable |
+| --- | --- |
+| 0 | Finalize schema, traversal interfaces, and evaluation dataset. |
+| 1 | Build a local graph index over a small technical-document corpus. |
+| 2 | Add toroidal coordinates, ANN seeding, and typed edge traversal. |
+| 3 | Expose GraphQL query directives and reasoning-path responses. |
+| 4 | Run baseline comparisons and publish results. |
+| 5 | Add portal hops and topology-aware sharding if earlier phases justify them. |
 
-- Transparent responses with graph reasoning paths
-- Multi-lingual concept mapping
-- Developer-first querying with typed schemas
-- Adaptive UX based on confidence and path ambiguity
-- Selective personalization with opt-out options
+Planned repository shape:
 
----
+```text
+src/
+  ingest/        document parsing, chunking, concept extraction
+  graph/         nodes, edges, evidence spans, memberships
+  embedding/     vector and toroidal coordinate generation
+  traversal/     policies, scoring, portal hops
+  api/           GraphQL schema and resolvers
+  eval/          datasets, baselines, metrics
+docs/
+  architecture.md
+  evaluation.md
+```
 
-## 🧠 9. Use Cases (Business Viability × Human Desirability × Technical Feasibility)
+## Design Principles
 
-| Company | Use Case | Value |
-|--------|----------|-------|
-| **Google** | **Semantic Engineering Knowledge Base for Internal LLMs**  Replace flat vector DBs with TSG-RAG to model product tech stacks (e.g., Android, Chrome) as interconnected, queryable concepts. Engineers and LLMs query design tradeoffs, APIs, or debugging patterns using GraphQL + reasoning hops. | 💰 **Business**: Speeds onboarding and reduces tribal knowledge reliance.  💡 **Human**: Traceable answers with clear dependency paths.  🛠️ **Tech**: Built to plug into existing Kubernetes-based infra. |
-| **Meta** | **Interest Graph Navigator for Creator Monetization**  Map user interests and creator content into a toroidal graph; enable recommendations, creator matches, and LLM-generated insight summaries via portal hops across subgraphs. | 💰 **Business**: More engagement and personalized monetization.  💡 **Human**: Transparent creator discovery.  🛠️ **Tech**: Integrates into Meta's TAO and GraphQL infra. |
-| **Amazon** | **Customer Support Copilot with Policy Reasoning**  Federate support docs and automate resolution through multi-hop graph reasoning. Explanations are surfaced via GraphQL with causal traceability. | 💰 **Business**: Lower ticket volume and reduced agent training.  💡 **Human**: Confidence and clarity for customers.  🛠️ **Tech**: Ready-to-deploy on Amazon's schema federation stack. |
-| **Netflix** | **Cross-Domain Metadata Inference for Content Tagging**  Traverse layered narrative elements (script, user data, culture) to infer genre, style, and tone. Tag new content semi-automatically. | 💰 **Business**: Faster A/B testing and UX improvement.  💡 **Human**: More relatable personalization.  🛠️ **Tech**: Scalable via their microservice and ML stack. |
-| **Apple** | **On-Device Conceptual Graph for Private GenAI**  Allow private LLMs to run on-device concept reasoning for health, tasks, or photos using lazily loaded subgraphs and portal hops. | 💰 **Business**: Differentiation via privacy-first AI.  💡 **Human**: Personalized intelligence, zero cloud exposure.  🛠️ **Tech**: Compatible with Apple Silicon + CoreML. |
+- Make retrieval inspectable before making it clever.
+- Treat LLMs as synthesis and policy helpers, not as hidden databases.
+- Return evidence paths for claims that cross concepts.
+- Put budgets in the API, not only in deployment config.
+- Prefer replaceable retrieval policies over one monolithic agent loop.
+- Measure against boring baselines before adding exotic machinery.
 
----
+## Potential Use Cases
 
-## 🧪 10. Research Extensions
+| Domain | Example |
+| --- | --- |
+| Engineering knowledge | Trace why an API, architecture decision, or reliability pattern changed over time. |
+| Support policy reasoning | Connect customer symptoms, policy rules, exceptions, and historical resolutions. |
+| Compliance and governance | Traverse regulation, internal controls, audits, and model behavior evidence. |
+| Research synthesis | Connect papers, claims, datasets, contradictions, and follow-up questions. |
+| Private knowledge assistants | Run local or tenant-scoped concept traversal with explicit privacy controls. |
 
-- Reinforcement learning of edge traversal policies
-- Contrastive graph embedding refinement via LLM feedback
-- Prompt-aware subgraph pruning
-- Visual "graph debugger" for reasoning paths
-- Self-healing federation via schema auto-composition
+## Risks and Open Questions
 
----
+| Risk | Why it matters | Mitigation |
+| --- | --- | --- |
+| Toroidal layout may not outperform simpler embeddings. | The central topology claim needs proof. | Keep layout pluggable and run direct ablations. |
+| Concept extraction can create noisy nodes and edges. | Bad graph structure harms traversal quality. | Track edge provenance and confidence; support pruning. |
+| LLM-guided traversal may overfit to plausible paths. | Explanations can become narrative instead of evidence. | Require evidence spans for returned hops. |
+| GraphQL directives can become too complex. | Developer ergonomics matter for adoption. | Start with a minimal directive set and add only measured needs. |
+| Federation can increase latency. | Cross-domain search is expensive. | Enforce hop, shard, time, and token budgets at query time. |
 
-## 🧑‍💻 11. About
+## Research Extensions
 
-Created by **Darsh Garg** — system design engineer & GenAI infra enthusiast.  
-This project represents the intersection of scalable AI infrastructure, human-centered design, and semantic systems.
+- learned edge traversal policies
+- contrastive refinement of graph and toroidal embeddings
+- path-aware reranking
+- visual graph debugger for retrieval traces
+- self-healing schema federation
+- privacy-preserving local subgraphs
 
-Contact: [darsh.garg@gmail.com]  
-GitHub: darshgarg7  
+## Author
 
----
+Created by Darsh Garg.
 
-## 📄 12. License
+- GitHub: `darshgarg7`
+- Email: `darsh.garg@gmail.com`
 
-MIT — use freely for educational, research, or portfolio purposes. Contributions welcome.
+## License
+
+MIT. Use freely for educational, research, and portfolio purposes.
