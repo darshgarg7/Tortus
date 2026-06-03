@@ -4,6 +4,8 @@ Tortus is a design-stage retrieval architecture for explainable, multi-hop RAG o
 
 The core idea is simple: instead of treating knowledge as a flat set of embedded chunks, Tortus models it as a typed semantic graph embedded onto a soft toroidal manifold. Queries start with vector retrieval, then traverse concept edges, cross domain portals when needed, and return both an answer and the path that produced it.
 
+The bet: topology-aware traversal can improve multi-hop retrieval without turning retrieval into an unbounded agent loop.
+
 > Query concepts, not just chunks. Return reasoning paths, not just citations.
 
 ## Status
@@ -27,6 +29,8 @@ Most production RAG systems are strong at retrieving nearby text and weak at pre
 Tortus targets knowledge systems where the answer depends on a path across concepts: engineering design history, policy reasoning, incident analysis, compliance research, product knowledge, and technical support.
 
 ![Flat semantic space versus toroidal semantic space](assets/torus-boundary.svg)
+
+Flat partitions create artificial distance; toroidal wrapping preserves neighborhood continuity across boundaries.
 
 ## Core Hypothesis
 
