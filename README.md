@@ -26,6 +26,8 @@ Most production RAG systems are strong at retrieving nearby text and weak at pre
 
 Tortus targets knowledge systems where the answer depends on a path across concepts: engineering design history, policy reasoning, incident analysis, compliance research, product knowledge, and technical support.
 
+![Flat semantic space versus toroidal semantic space](assets/torus-boundary.svg)
+
 ## Core Hypothesis
 
 A semantic graph embedded on a toroidal coordinate space can make retrieval more navigable and operationally scalable by combining:
