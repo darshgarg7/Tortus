@@ -1,16 +1,67 @@
 # Tortus: Toroidal Semantic Graph Retrieval
 
+![Tortus dashboard demo](assets/tortus-dashboard-demo.gif)
+
 Tortus is a design-stage retrieval architecture for explainable, multi-hop RAG over large and federated knowledge bases.
 
 The core idea is simple: instead of treating knowledge as a flat set of embedded chunks, Tortus models it as a typed semantic graph embedded onto a soft toroidal manifold. Queries start with vector retrieval, then traverse concept edges, cross domain portals when needed, and return both an answer and the path that produced it.
+
+The bet: topology-aware traversal can improve multi-hop retrieval without turning retrieval into an unbounded agent loop.
 
 > Query concepts, not just chunks. Return reasoning paths, not just citations.
 
 ## Status
 
-This repository is currently an architecture/specification draft. There is no implementation yet.
+This repository now contains the first executable v0 slice: a Python package, typed graph schemas, deterministic engineering corpus with distractors, local embedding fallback, exact vector, BM25, hybrid, community-summary, and bounded-agentic baselines, SQLite graph store, toroidal projection, bounded traversal, portal-hop limits, shard-fanout simulation, GraphQL/FastAPI endpoint, dashboard query lab, CLI, strategy-comparison smoke/golden/stress/full/benchmark evals, path-recall metrics, layout ablations, JSON/DuckDB eval exports, benchmark-report generation, and a reproducible demo script.
 
-The intended MVP is a local prototype that validates whether toroidal graph locality plus typed traversal improves multi-hop retrieval quality, explainability, and shard affinity compared with vector-only RAG, hybrid sparse+dense retrieval, and conventional GraphRAG baselines.
+The implementation is still early. The intended MVP remains a local prototype that validates whether toroidal graph locality plus typed traversal improves multi-hop retrieval quality, explainability, and shard affinity compared with vector-only RAG, hybrid sparse+dense retrieval, and conventional GraphRAG baselines.
+
+Current evidence strength is prototype-level. The benchmark numbers below are useful for checking whether the architecture and evaluation harness behave coherently, but they are not yet a research claim about real-world retrieval superiority.
+
+| Layer | Current state | Evidence implication | Hardening move |
+| --- | --- | --- | --- |
+| Corpus | Built-in engineering mini-corpus with synthetic incidents, runbooks, and distractors. | Good for deterministic system tests; too small and self-authored for external validity. | Add commit-pinned public Kubernetes, OpenTelemetry, and architecture/RFC corpora with snapshot manifests. |
+| Embeddings | Local hash embedding fallback, with API-backed embedding adapter available. | Validates interfaces and reproducibility; does not prove semantic embedding quality. | Run cached `text-embedding-3-large` or equivalent embeddings and report cost, cache hits, and drift. |
+| Extraction | Deterministic term and edge extraction. | Makes tests repeatable; does not test noisy LLM concept extraction. | Add schema-constrained LLM extraction, confidence calibration, retry handling, and human spot checks. |
+| Eval labels | 100-question candidate set generated from known source patterns. | Useful pressure test; not a completed golden set. | Manually audit expected evidence URIs, path labels, and negative cases before treating metrics as benchmark results. |
+| Baselines | Local vector, BM25, hybrid, graph-local, layout, community-summary, and bounded-agentic approximations. | Good sanity checks; not a final comparison to external systems. | Add serious GraphRAG/RAPTOR/HippoRAG/LightRAG-style implementations or clearly scoped reproductions. |
+| Scale | 116 v0 questions over a tiny graph. | Shows mechanics and failure modes; not enough statistical power. | Expand to audited multi-corpus evals with confidence intervals and failure taxonomy by query type. |
+
+## Quickstart
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e '.[dev]'
+
+.venv/bin/tortus ingest --corpus engineering
+.venv/bin/tortus index --layout torus
+.venv/bin/tortus query "How did the token migration incident connect authentication and tracing?" --explain
+.venv/bin/tortus golden-set --out data/golden_set.json --count 100
+.venv/bin/tortus eval --suite benchmark --strategies all \
+  --json-out data/eval/benchmark.json \
+  --duckdb-out data/eval/results.duckdb
+.venv/bin/tortus report \
+  --eval-json data/eval/benchmark.json \
+  --out data/reports/eval-report.md
+.venv/bin/tortus serve --port 8010
+# Dashboard running at http://localhost:8010
+```
+
+Or run the full local demo path:
+
+```bash
+scripts/demo.sh
+```
+
+Run checks:
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/mypy src/tortus scripts/run_pytest.py
+.venv/bin/python scripts/run_pytest.py
+```
+
+`scripts/run_pytest.py` exists because some macOS Python builds crash when pytest imports `readline` during startup. It only disables that optional import for pytest.
 
 ## Problem
 
@@ -27,6 +78,8 @@ Most production RAG systems are strong at retrieving nearby text and weak at pre
 Tortus targets knowledge systems where the answer depends on a path across concepts: engineering design history, policy reasoning, incident analysis, compliance research, product knowledge, and technical support.
 
 ![Flat semantic space versus toroidal semantic space](assets/torus-boundary.svg)
+
+Flat partitions create artificial distance; toroidal wrapping preserves neighborhood continuity across boundaries.
 
 ## Core Hypothesis
 
@@ -102,6 +155,7 @@ flowchart TD
     P[GraphQL API] --> J
     P --> L
     P --> M
+    P -.-> G
 ```
 
 ## Data Model
@@ -219,13 +273,44 @@ Tortus should be judged by evidence, not novelty language.
 | Cost control | tokens per answered query, LLM calls per query, timeout rate |
 | Federation | cross-subgraph success rate, partial-answer quality, failover rate |
 
-Required baselines:
+Current v0 eval strategies:
 
-- vector-only RAG
-- BM25 plus dense hybrid retrieval
-- conventional knowledge graph lookup
-- GraphRAG-style community summaries
-- agentic search with tool calls
+- `tortus_torus`
+- `vector_only`
+- `bm25`
+- `hybrid_dense_bm25`
+- `graph_local`
+- `community_summary`
+- `bounded_agentic`
+- `torus_layout`
+- `euclidean_layout`
+- `random_layout`
+
+Current v0 sanity benchmark, using `tortus eval --suite benchmark --strategies all` over 116 questions and 1,160 strategy rows. A pass requires term recall >= 0.50, source recall >= 0.50, and path recall >= 0.50:
+
+| Strategy | Pass | Source recall | Path recall | p95 latency ms | Mean portal hops | Mean shard fanout |
+| --- | --- | --- | --- | --- | --- | --- |
+| `tortus_torus` | 0.94 | 0.89 | 1.00 | 1.6 | 8.0 | 8.6 |
+| `bounded_agentic` | 0.84 | 0.73 | 1.00 | 1.8 | 3.0 | 4.5 |
+| `graph_local` | 0.21 | 0.98 | 0.16 | 1.2 | 0.0 | 8.0 |
+| `vector_only` | 0.01 | 0.79 | 0.01 | 0.6 | 0.0 | 4.6 |
+| `bm25` | 0.01 | 0.73 | 0.01 | 0.4 | 0.0 | 4.4 |
+| `hybrid_dense_bm25` | 0.01 | 0.82 | 0.01 | 0.8 | 0.0 | 4.5 |
+| `community_summary` | 0.01 | 0.61 | 0.01 | 0.4 | 0.0 | 3.9 |
+| `torus_layout` | 0.01 | 0.64 | 0.01 | 0.6 | 0.0 | 4.2 |
+| `euclidean_layout` | 0.01 | 0.62 | 0.01 | 0.4 | 0.0 | 4.7 |
+| `random_layout` | 0.01 | 0.46 | 0.01 | 0.4 | 0.0 | 4.6 |
+
+The positive signal is path recall on boundary-crossing, stress, and candidate-golden questions. The negative signal is high fanout: Tortus wins recall by spending more portal and shard budget than the bounded-agentic baseline. Because the corpus, extraction, embeddings, and labels are still controlled fixtures, this table should be read as a v0 harness result, not as proof that toroidal retrieval beats production baselines. The current research target is to reduce fanout without losing path quality, then rerun on an audited external corpus.
+
+The `data/golden_set.json` file is a deterministic 100-question candidate golden set with expected evidence URIs and hop targets. Its `audit_status` is intentionally `candidate_needs_human_review`; it is ready for manual review, not falsely presented as a completed human-audited benchmark.
+
+Remaining work for a publishable v1:
+
+- replace deterministic approximations with external GraphRAG and agentic-search implementations
+- scale beyond the built-in corpus to commit-pinned public engineering docs
+- manually audit and revise the 100-question candidate golden set
+- profile real API-backed embedding and synthesis cost
 
 The project is successful only if it can show a measurable improvement for questions that require concept paths, while staying competitive on latency and cost.
 
@@ -242,19 +327,38 @@ The first implementation should be small enough to finish and rigorous enough to
 | 4 | Run baseline comparisons and publish results. |
 | 5 | Add portal hops and topology-aware sharding if earlier phases justify them. |
 
-Planned repository shape:
+Current repository shape:
 
 ```text
 src/
-  ingest/        document parsing, chunking, concept extraction
-  graph/         nodes, edges, evidence spans, memberships
-  embedding/     vector and toroidal coordinate generation
-  traversal/     policies, scoring, portal hops
-  api/           GraphQL schema and resolvers
-  eval/          datasets, baselines, metrics
+  tortus/
+    corpus.py       built-in engineering corpus and chunking
+    extract.py      deterministic concept and edge extraction
+    embeddings.py   local and Azure OpenAI embedding adapters
+    graph_store.py  SQLite graph persistence
+    torus.py        toroidal distance and projection
+    traversal.py    bounded path retrieval
+    baselines.py    vector, BM25, hybrid, community, agentic, local-graph, and Tortus runners
+    sharding.py     toroidal shard assignment and crossing metrics
+    golden.py       deterministic candidate golden-set generation
+    api.py          FastAPI, GraphQL, and dashboard routes
+    eval.py         smoke/golden/stress/full/benchmark evaluation harness
+    eval_store.py   JSON and DuckDB eval persistence
+    report.py       benchmark markdown report and failure taxonomy
+    cli.py          ingest/index/query/golden-set/eval/report/serve commands
+    templates/      Jinja dashboard shell
+    static/         Plotly dashboard JavaScript and CSS
+data/
+  golden_set.json   100-question candidate golden set requiring manual audit
+  reports/
+    eval-report.md  generated benchmark report
 docs/
-  architecture.md
-  evaluation.md
+  evidence-hardening.md  gates from v0 harness to credible external benchmark
+scripts/
+  demo.sh           rebuild, query, evaluate, and report
+  run_pytest.py     pytest startup wrapper for local macOS stability
+tests/
+  test_*.py
 ```
 
 ## Design Principles
@@ -294,6 +398,13 @@ docs/
 - visual graph debugger for retrieval traces
 - self-healing schema federation
 - privacy-preserving local subgraphs
+
+## What I Learned
+
+- Path recall is the real differentiator: vector, BM25, and hybrid retrieval can find terms and nearby sources, but they do not naturally return auditable multi-hop evidence paths.
+- The toroidal traversal currently wins by spending more portal and shard budget. The next algorithmic target is reducing fanout while preserving boundary-crossing recall.
+- The bounded-agentic baseline is strong enough to keep in the benchmark. Tortus has to justify itself with provenance, reproducibility, and predictable budgets, not only raw recall.
+- Candidate golden sets are easy to generate and useful for pressure testing, but the numbers should not be treated as research claims until the evidence labels are manually audited.
 
 ## Author
 

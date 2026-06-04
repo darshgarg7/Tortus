@@ -1,0 +1,2102 @@
+[
+  {
+    "id": "golden100-001-auth-trace-incident",
+    "suite": "golden_candidate",
+    "question": "Which evidence path explains service account token migration, gateway retries, and trace continuity?",
+    "expected_terms": [
+      "token",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/incident-token-observability",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-002-audience-dashboard",
+    "suite": "golden_candidate",
+    "question": "Which evidence path explains audience validation dashboards and gateway retry behavior?",
+    "expected_terms": [
+      "audience",
+      "validation",
+      "dashboard",
+      "retry"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/runbook-auth-trace"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-003-token-projection-rollout",
+    "suite": "golden_candidate",
+    "question": "Which evidence path explains bound token projection, validation rollout, and incident metrics?",
+    "expected_terms": [
+      "projection",
+      "validation",
+      "metrics",
+      "token"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-004-cache-distractor",
+    "suite": "golden_candidate",
+    "question": "Which evidence path explains gateway token cache tuning versus trace propagation failures?",
+    "expected_terms": [
+      "cache",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-token-cache-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-005-sidecar-distractor",
+    "suite": "golden_candidate",
+    "question": "Which evidence path explains sidecar drain observability versus token audience failures?",
+    "expected_terms": [
+      "sidecar",
+      "shutdown",
+      "token",
+      "audience"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/sidecar-drain-observability",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-006-legacy-secret-cleanup",
+    "suite": "golden_candidate",
+    "question": "Which evidence path explains legacy secret cleanup versus bound service account token behavior?",
+    "expected_terms": [
+      "legacy",
+      "secret",
+      "bound",
+      "long-lived"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/legacy-secret-cleanup-distractor",
+      "builtin://kubernetes/kep-service-account-tokens"
+    ],
+    "expected_edge_types": [
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-007-trace-sampling-distractor",
+    "suite": "golden_candidate",
+    "question": "Which evidence path explains trace sampling policy versus fragmented gateway traces?",
+    "expected_terms": [
+      "sampling",
+      "fragmented",
+      "gateway",
+      "trace"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/trace-sampling-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-008-runbook-correlation",
+    "suite": "golden_candidate",
+    "question": "Which evidence path explains runbook correlation across audience metrics, retry logs, and propagation tests?",
+    "expected_terms": [
+      "runbook",
+      "metrics",
+      "retry",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/runbook-auth-trace",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context"
+    ],
+    "expected_edge_types": [
+      "portal",
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-009-policy-to-observability",
+    "suite": "golden_candidate",
+    "question": "Which evidence path explains token policy crossing into observability investigation?",
+    "expected_terms": [
+      "token",
+      "policy",
+      "observability",
+      "incident"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-010-gateway-boundary",
+    "suite": "golden_candidate",
+    "question": "Which evidence path explains gateway boundary behavior across authentication and propagation?",
+    "expected_terms": [
+      "gateway",
+      "authentication",
+      "propagation",
+      "boundary"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-011-auth-trace-incident",
+    "suite": "golden_candidate",
+    "question": "Why does service account token migration, gateway retries, and trace continuity require more than vector-only retrieval?",
+    "expected_terms": [
+      "token",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/incident-token-observability",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-012-audience-dashboard",
+    "suite": "golden_candidate",
+    "question": "Why does audience validation dashboards and gateway retry behavior require more than vector-only retrieval?",
+    "expected_terms": [
+      "audience",
+      "validation",
+      "dashboard",
+      "retry"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/runbook-auth-trace"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-013-token-projection-rollout",
+    "suite": "golden_candidate",
+    "question": "Why does bound token projection, validation rollout, and incident metrics require more than vector-only retrieval?",
+    "expected_terms": [
+      "projection",
+      "validation",
+      "metrics",
+      "token"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-014-cache-distractor",
+    "suite": "golden_candidate",
+    "question": "Why does gateway token cache tuning versus trace propagation failures require more than vector-only retrieval?",
+    "expected_terms": [
+      "cache",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-token-cache-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-015-sidecar-distractor",
+    "suite": "golden_candidate",
+    "question": "Why does sidecar drain observability versus token audience failures require more than vector-only retrieval?",
+    "expected_terms": [
+      "sidecar",
+      "shutdown",
+      "token",
+      "audience"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/sidecar-drain-observability",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-016-legacy-secret-cleanup",
+    "suite": "golden_candidate",
+    "question": "Why does legacy secret cleanup versus bound service account token behavior require more than vector-only retrieval?",
+    "expected_terms": [
+      "legacy",
+      "secret",
+      "bound",
+      "long-lived"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/legacy-secret-cleanup-distractor",
+      "builtin://kubernetes/kep-service-account-tokens"
+    ],
+    "expected_edge_types": [
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-017-trace-sampling-distractor",
+    "suite": "golden_candidate",
+    "question": "Why does trace sampling policy versus fragmented gateway traces require more than vector-only retrieval?",
+    "expected_terms": [
+      "sampling",
+      "fragmented",
+      "gateway",
+      "trace"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/trace-sampling-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-018-runbook-correlation",
+    "suite": "golden_candidate",
+    "question": "Why does runbook correlation across audience metrics, retry logs, and propagation tests require more than vector-only retrieval?",
+    "expected_terms": [
+      "runbook",
+      "metrics",
+      "retry",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/runbook-auth-trace",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context"
+    ],
+    "expected_edge_types": [
+      "portal",
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-019-policy-to-observability",
+    "suite": "golden_candidate",
+    "question": "Why does token policy crossing into observability investigation require more than vector-only retrieval?",
+    "expected_terms": [
+      "token",
+      "policy",
+      "observability",
+      "incident"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-020-gateway-boundary",
+    "suite": "golden_candidate",
+    "question": "Why does gateway boundary behavior across authentication and propagation require more than vector-only retrieval?",
+    "expected_terms": [
+      "gateway",
+      "authentication",
+      "propagation",
+      "boundary"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-021-auth-trace-incident",
+    "suite": "golden_candidate",
+    "question": "What source-backed path connects service account token migration, gateway retries, and trace continuity?",
+    "expected_terms": [
+      "token",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/incident-token-observability",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-022-audience-dashboard",
+    "suite": "golden_candidate",
+    "question": "What source-backed path connects audience validation dashboards and gateway retry behavior?",
+    "expected_terms": [
+      "audience",
+      "validation",
+      "dashboard",
+      "retry"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/runbook-auth-trace"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-023-token-projection-rollout",
+    "suite": "golden_candidate",
+    "question": "What source-backed path connects bound token projection, validation rollout, and incident metrics?",
+    "expected_terms": [
+      "projection",
+      "validation",
+      "metrics",
+      "token"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-024-cache-distractor",
+    "suite": "golden_candidate",
+    "question": "What source-backed path connects gateway token cache tuning versus trace propagation failures?",
+    "expected_terms": [
+      "cache",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-token-cache-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-025-sidecar-distractor",
+    "suite": "golden_candidate",
+    "question": "What source-backed path connects sidecar drain observability versus token audience failures?",
+    "expected_terms": [
+      "sidecar",
+      "shutdown",
+      "token",
+      "audience"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/sidecar-drain-observability",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-026-legacy-secret-cleanup",
+    "suite": "golden_candidate",
+    "question": "What source-backed path connects legacy secret cleanup versus bound service account token behavior?",
+    "expected_terms": [
+      "legacy",
+      "secret",
+      "bound",
+      "long-lived"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/legacy-secret-cleanup-distractor",
+      "builtin://kubernetes/kep-service-account-tokens"
+    ],
+    "expected_edge_types": [
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-027-trace-sampling-distractor",
+    "suite": "golden_candidate",
+    "question": "What source-backed path connects trace sampling policy versus fragmented gateway traces?",
+    "expected_terms": [
+      "sampling",
+      "fragmented",
+      "gateway",
+      "trace"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/trace-sampling-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-028-runbook-correlation",
+    "suite": "golden_candidate",
+    "question": "What source-backed path connects runbook correlation across audience metrics, retry logs, and propagation tests?",
+    "expected_terms": [
+      "runbook",
+      "metrics",
+      "retry",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/runbook-auth-trace",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context"
+    ],
+    "expected_edge_types": [
+      "portal",
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-029-policy-to-observability",
+    "suite": "golden_candidate",
+    "question": "What source-backed path connects token policy crossing into observability investigation?",
+    "expected_terms": [
+      "token",
+      "policy",
+      "observability",
+      "incident"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-030-gateway-boundary",
+    "suite": "golden_candidate",
+    "question": "What source-backed path connects gateway boundary behavior across authentication and propagation?",
+    "expected_terms": [
+      "gateway",
+      "authentication",
+      "propagation",
+      "boundary"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-031-auth-trace-incident",
+    "suite": "golden_candidate",
+    "question": "How should an incident responder reason across service account token migration, gateway retries, and trace continuity?",
+    "expected_terms": [
+      "token",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/incident-token-observability",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-032-audience-dashboard",
+    "suite": "golden_candidate",
+    "question": "How should an incident responder reason across audience validation dashboards and gateway retry behavior?",
+    "expected_terms": [
+      "audience",
+      "validation",
+      "dashboard",
+      "retry"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/runbook-auth-trace"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-033-token-projection-rollout",
+    "suite": "golden_candidate",
+    "question": "How should an incident responder reason across bound token projection, validation rollout, and incident metrics?",
+    "expected_terms": [
+      "projection",
+      "validation",
+      "metrics",
+      "token"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-034-cache-distractor",
+    "suite": "golden_candidate",
+    "question": "How should an incident responder reason across gateway token cache tuning versus trace propagation failures?",
+    "expected_terms": [
+      "cache",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-token-cache-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-035-sidecar-distractor",
+    "suite": "golden_candidate",
+    "question": "How should an incident responder reason across sidecar drain observability versus token audience failures?",
+    "expected_terms": [
+      "sidecar",
+      "shutdown",
+      "token",
+      "audience"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/sidecar-drain-observability",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-036-legacy-secret-cleanup",
+    "suite": "golden_candidate",
+    "question": "How should an incident responder reason across legacy secret cleanup versus bound service account token behavior?",
+    "expected_terms": [
+      "legacy",
+      "secret",
+      "bound",
+      "long-lived"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/legacy-secret-cleanup-distractor",
+      "builtin://kubernetes/kep-service-account-tokens"
+    ],
+    "expected_edge_types": [
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-037-trace-sampling-distractor",
+    "suite": "golden_candidate",
+    "question": "How should an incident responder reason across trace sampling policy versus fragmented gateway traces?",
+    "expected_terms": [
+      "sampling",
+      "fragmented",
+      "gateway",
+      "trace"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/trace-sampling-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-038-runbook-correlation",
+    "suite": "golden_candidate",
+    "question": "How should an incident responder reason across runbook correlation across audience metrics, retry logs, and propagation tests?",
+    "expected_terms": [
+      "runbook",
+      "metrics",
+      "retry",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/runbook-auth-trace",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context"
+    ],
+    "expected_edge_types": [
+      "portal",
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-039-policy-to-observability",
+    "suite": "golden_candidate",
+    "question": "How should an incident responder reason across token policy crossing into observability investigation?",
+    "expected_terms": [
+      "token",
+      "policy",
+      "observability",
+      "incident"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-040-gateway-boundary",
+    "suite": "golden_candidate",
+    "question": "How should an incident responder reason across gateway boundary behavior across authentication and propagation?",
+    "expected_terms": [
+      "gateway",
+      "authentication",
+      "propagation",
+      "boundary"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-041-auth-trace-incident",
+    "suite": "golden_candidate",
+    "question": "Which documents distinguish the root cause from distractors for service account token migration, gateway retries, and trace continuity?",
+    "expected_terms": [
+      "token",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/incident-token-observability",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-042-audience-dashboard",
+    "suite": "golden_candidate",
+    "question": "Which documents distinguish the root cause from distractors for audience validation dashboards and gateway retry behavior?",
+    "expected_terms": [
+      "audience",
+      "validation",
+      "dashboard",
+      "retry"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/runbook-auth-trace"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-043-token-projection-rollout",
+    "suite": "golden_candidate",
+    "question": "Which documents distinguish the root cause from distractors for bound token projection, validation rollout, and incident metrics?",
+    "expected_terms": [
+      "projection",
+      "validation",
+      "metrics",
+      "token"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-044-cache-distractor",
+    "suite": "golden_candidate",
+    "question": "Which documents distinguish the root cause from distractors for gateway token cache tuning versus trace propagation failures?",
+    "expected_terms": [
+      "cache",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-token-cache-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-045-sidecar-distractor",
+    "suite": "golden_candidate",
+    "question": "Which documents distinguish the root cause from distractors for sidecar drain observability versus token audience failures?",
+    "expected_terms": [
+      "sidecar",
+      "shutdown",
+      "token",
+      "audience"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/sidecar-drain-observability",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-046-legacy-secret-cleanup",
+    "suite": "golden_candidate",
+    "question": "Which documents distinguish the root cause from distractors for legacy secret cleanup versus bound service account token behavior?",
+    "expected_terms": [
+      "legacy",
+      "secret",
+      "bound",
+      "long-lived"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/legacy-secret-cleanup-distractor",
+      "builtin://kubernetes/kep-service-account-tokens"
+    ],
+    "expected_edge_types": [
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-047-trace-sampling-distractor",
+    "suite": "golden_candidate",
+    "question": "Which documents distinguish the root cause from distractors for trace sampling policy versus fragmented gateway traces?",
+    "expected_terms": [
+      "sampling",
+      "fragmented",
+      "gateway",
+      "trace"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/trace-sampling-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-048-runbook-correlation",
+    "suite": "golden_candidate",
+    "question": "Which documents distinguish the root cause from distractors for runbook correlation across audience metrics, retry logs, and propagation tests?",
+    "expected_terms": [
+      "runbook",
+      "metrics",
+      "retry",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/runbook-auth-trace",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context"
+    ],
+    "expected_edge_types": [
+      "portal",
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-049-policy-to-observability",
+    "suite": "golden_candidate",
+    "question": "Which documents distinguish the root cause from distractors for token policy crossing into observability investigation?",
+    "expected_terms": [
+      "token",
+      "policy",
+      "observability",
+      "incident"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-050-gateway-boundary",
+    "suite": "golden_candidate",
+    "question": "Which documents distinguish the root cause from distractors for gateway boundary behavior across authentication and propagation?",
+    "expected_terms": [
+      "gateway",
+      "authentication",
+      "propagation",
+      "boundary"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-051-auth-trace-incident",
+    "suite": "golden_candidate",
+    "question": "Where does the traversal need a portal hop for service account token migration, gateway retries, and trace continuity?",
+    "expected_terms": [
+      "token",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/incident-token-observability",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-052-audience-dashboard",
+    "suite": "golden_candidate",
+    "question": "Where does the traversal need a portal hop for audience validation dashboards and gateway retry behavior?",
+    "expected_terms": [
+      "audience",
+      "validation",
+      "dashboard",
+      "retry"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/runbook-auth-trace"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-053-token-projection-rollout",
+    "suite": "golden_candidate",
+    "question": "Where does the traversal need a portal hop for bound token projection, validation rollout, and incident metrics?",
+    "expected_terms": [
+      "projection",
+      "validation",
+      "metrics",
+      "token"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-054-cache-distractor",
+    "suite": "golden_candidate",
+    "question": "Where does the traversal need a portal hop for gateway token cache tuning versus trace propagation failures?",
+    "expected_terms": [
+      "cache",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-token-cache-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-055-sidecar-distractor",
+    "suite": "golden_candidate",
+    "question": "Where does the traversal need a portal hop for sidecar drain observability versus token audience failures?",
+    "expected_terms": [
+      "sidecar",
+      "shutdown",
+      "token",
+      "audience"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/sidecar-drain-observability",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-056-legacy-secret-cleanup",
+    "suite": "golden_candidate",
+    "question": "Where does the traversal need a portal hop for legacy secret cleanup versus bound service account token behavior?",
+    "expected_terms": [
+      "legacy",
+      "secret",
+      "bound",
+      "long-lived"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/legacy-secret-cleanup-distractor",
+      "builtin://kubernetes/kep-service-account-tokens"
+    ],
+    "expected_edge_types": [
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-057-trace-sampling-distractor",
+    "suite": "golden_candidate",
+    "question": "Where does the traversal need a portal hop for trace sampling policy versus fragmented gateway traces?",
+    "expected_terms": [
+      "sampling",
+      "fragmented",
+      "gateway",
+      "trace"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/trace-sampling-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-058-runbook-correlation",
+    "suite": "golden_candidate",
+    "question": "Where does the traversal need a portal hop for runbook correlation across audience metrics, retry logs, and propagation tests?",
+    "expected_terms": [
+      "runbook",
+      "metrics",
+      "retry",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/runbook-auth-trace",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context"
+    ],
+    "expected_edge_types": [
+      "portal",
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-059-policy-to-observability",
+    "suite": "golden_candidate",
+    "question": "Where does the traversal need a portal hop for token policy crossing into observability investigation?",
+    "expected_terms": [
+      "token",
+      "policy",
+      "observability",
+      "incident"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-060-gateway-boundary",
+    "suite": "golden_candidate",
+    "question": "Where does the traversal need a portal hop for gateway boundary behavior across authentication and propagation?",
+    "expected_terms": [
+      "gateway",
+      "authentication",
+      "propagation",
+      "boundary"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-061-auth-trace-incident",
+    "suite": "golden_candidate",
+    "question": "What evidence would prove or reject the hypothesis about service account token migration, gateway retries, and trace continuity?",
+    "expected_terms": [
+      "token",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/incident-token-observability",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-062-audience-dashboard",
+    "suite": "golden_candidate",
+    "question": "What evidence would prove or reject the hypothesis about audience validation dashboards and gateway retry behavior?",
+    "expected_terms": [
+      "audience",
+      "validation",
+      "dashboard",
+      "retry"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/runbook-auth-trace"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-063-token-projection-rollout",
+    "suite": "golden_candidate",
+    "question": "What evidence would prove or reject the hypothesis about bound token projection, validation rollout, and incident metrics?",
+    "expected_terms": [
+      "projection",
+      "validation",
+      "metrics",
+      "token"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-064-cache-distractor",
+    "suite": "golden_candidate",
+    "question": "What evidence would prove or reject the hypothesis about gateway token cache tuning versus trace propagation failures?",
+    "expected_terms": [
+      "cache",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-token-cache-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-065-sidecar-distractor",
+    "suite": "golden_candidate",
+    "question": "What evidence would prove or reject the hypothesis about sidecar drain observability versus token audience failures?",
+    "expected_terms": [
+      "sidecar",
+      "shutdown",
+      "token",
+      "audience"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/sidecar-drain-observability",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-066-legacy-secret-cleanup",
+    "suite": "golden_candidate",
+    "question": "What evidence would prove or reject the hypothesis about legacy secret cleanup versus bound service account token behavior?",
+    "expected_terms": [
+      "legacy",
+      "secret",
+      "bound",
+      "long-lived"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/legacy-secret-cleanup-distractor",
+      "builtin://kubernetes/kep-service-account-tokens"
+    ],
+    "expected_edge_types": [
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-067-trace-sampling-distractor",
+    "suite": "golden_candidate",
+    "question": "What evidence would prove or reject the hypothesis about trace sampling policy versus fragmented gateway traces?",
+    "expected_terms": [
+      "sampling",
+      "fragmented",
+      "gateway",
+      "trace"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/trace-sampling-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-068-runbook-correlation",
+    "suite": "golden_candidate",
+    "question": "What evidence would prove or reject the hypothesis about runbook correlation across audience metrics, retry logs, and propagation tests?",
+    "expected_terms": [
+      "runbook",
+      "metrics",
+      "retry",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/runbook-auth-trace",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context"
+    ],
+    "expected_edge_types": [
+      "portal",
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-069-policy-to-observability",
+    "suite": "golden_candidate",
+    "question": "What evidence would prove or reject the hypothesis about token policy crossing into observability investigation?",
+    "expected_terms": [
+      "token",
+      "policy",
+      "observability",
+      "incident"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-070-gateway-boundary",
+    "suite": "golden_candidate",
+    "question": "What evidence would prove or reject the hypothesis about gateway boundary behavior across authentication and propagation?",
+    "expected_terms": [
+      "gateway",
+      "authentication",
+      "propagation",
+      "boundary"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-071-auth-trace-incident",
+    "suite": "golden_candidate",
+    "question": "How do the expected evidence spans line up for service account token migration, gateway retries, and trace continuity?",
+    "expected_terms": [
+      "token",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/incident-token-observability",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-072-audience-dashboard",
+    "suite": "golden_candidate",
+    "question": "How do the expected evidence spans line up for audience validation dashboards and gateway retry behavior?",
+    "expected_terms": [
+      "audience",
+      "validation",
+      "dashboard",
+      "retry"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/runbook-auth-trace"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-073-token-projection-rollout",
+    "suite": "golden_candidate",
+    "question": "How do the expected evidence spans line up for bound token projection, validation rollout, and incident metrics?",
+    "expected_terms": [
+      "projection",
+      "validation",
+      "metrics",
+      "token"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-074-cache-distractor",
+    "suite": "golden_candidate",
+    "question": "How do the expected evidence spans line up for gateway token cache tuning versus trace propagation failures?",
+    "expected_terms": [
+      "cache",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-token-cache-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-075-sidecar-distractor",
+    "suite": "golden_candidate",
+    "question": "How do the expected evidence spans line up for sidecar drain observability versus token audience failures?",
+    "expected_terms": [
+      "sidecar",
+      "shutdown",
+      "token",
+      "audience"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/sidecar-drain-observability",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-076-legacy-secret-cleanup",
+    "suite": "golden_candidate",
+    "question": "How do the expected evidence spans line up for legacy secret cleanup versus bound service account token behavior?",
+    "expected_terms": [
+      "legacy",
+      "secret",
+      "bound",
+      "long-lived"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/legacy-secret-cleanup-distractor",
+      "builtin://kubernetes/kep-service-account-tokens"
+    ],
+    "expected_edge_types": [
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-077-trace-sampling-distractor",
+    "suite": "golden_candidate",
+    "question": "How do the expected evidence spans line up for trace sampling policy versus fragmented gateway traces?",
+    "expected_terms": [
+      "sampling",
+      "fragmented",
+      "gateway",
+      "trace"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/trace-sampling-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-078-runbook-correlation",
+    "suite": "golden_candidate",
+    "question": "How do the expected evidence spans line up for runbook correlation across audience metrics, retry logs, and propagation tests?",
+    "expected_terms": [
+      "runbook",
+      "metrics",
+      "retry",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/runbook-auth-trace",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context"
+    ],
+    "expected_edge_types": [
+      "portal",
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-079-policy-to-observability",
+    "suite": "golden_candidate",
+    "question": "How do the expected evidence spans line up for token policy crossing into observability investigation?",
+    "expected_terms": [
+      "token",
+      "policy",
+      "observability",
+      "incident"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-080-gateway-boundary",
+    "suite": "golden_candidate",
+    "question": "How do the expected evidence spans line up for gateway boundary behavior across authentication and propagation?",
+    "expected_terms": [
+      "gateway",
+      "authentication",
+      "propagation",
+      "boundary"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-081-auth-trace-incident",
+    "suite": "golden_candidate",
+    "question": "Which cross-domain sources should be retrieved first for service account token migration, gateway retries, and trace continuity?",
+    "expected_terms": [
+      "token",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/incident-token-observability",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-082-audience-dashboard",
+    "suite": "golden_candidate",
+    "question": "Which cross-domain sources should be retrieved first for audience validation dashboards and gateway retry behavior?",
+    "expected_terms": [
+      "audience",
+      "validation",
+      "dashboard",
+      "retry"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/runbook-auth-trace"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-083-token-projection-rollout",
+    "suite": "golden_candidate",
+    "question": "Which cross-domain sources should be retrieved first for bound token projection, validation rollout, and incident metrics?",
+    "expected_terms": [
+      "projection",
+      "validation",
+      "metrics",
+      "token"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-084-cache-distractor",
+    "suite": "golden_candidate",
+    "question": "Which cross-domain sources should be retrieved first for gateway token cache tuning versus trace propagation failures?",
+    "expected_terms": [
+      "cache",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-token-cache-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-085-sidecar-distractor",
+    "suite": "golden_candidate",
+    "question": "Which cross-domain sources should be retrieved first for sidecar drain observability versus token audience failures?",
+    "expected_terms": [
+      "sidecar",
+      "shutdown",
+      "token",
+      "audience"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/sidecar-drain-observability",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-086-legacy-secret-cleanup",
+    "suite": "golden_candidate",
+    "question": "Which cross-domain sources should be retrieved first for legacy secret cleanup versus bound service account token behavior?",
+    "expected_terms": [
+      "legacy",
+      "secret",
+      "bound",
+      "long-lived"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/legacy-secret-cleanup-distractor",
+      "builtin://kubernetes/kep-service-account-tokens"
+    ],
+    "expected_edge_types": [
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-087-trace-sampling-distractor",
+    "suite": "golden_candidate",
+    "question": "Which cross-domain sources should be retrieved first for trace sampling policy versus fragmented gateway traces?",
+    "expected_terms": [
+      "sampling",
+      "fragmented",
+      "gateway",
+      "trace"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/trace-sampling-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-088-runbook-correlation",
+    "suite": "golden_candidate",
+    "question": "Which cross-domain sources should be retrieved first for runbook correlation across audience metrics, retry logs, and propagation tests?",
+    "expected_terms": [
+      "runbook",
+      "metrics",
+      "retry",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/runbook-auth-trace",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context"
+    ],
+    "expected_edge_types": [
+      "portal",
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-089-policy-to-observability",
+    "suite": "golden_candidate",
+    "question": "Which cross-domain sources should be retrieved first for token policy crossing into observability investigation?",
+    "expected_terms": [
+      "token",
+      "policy",
+      "observability",
+      "incident"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-090-gateway-boundary",
+    "suite": "golden_candidate",
+    "question": "Which cross-domain sources should be retrieved first for gateway boundary behavior across authentication and propagation?",
+    "expected_terms": [
+      "gateway",
+      "authentication",
+      "propagation",
+      "boundary"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-091-auth-trace-incident",
+    "suite": "golden_candidate",
+    "question": "Why is a single local chunk insufficient to explain service account token migration, gateway retries, and trace continuity?",
+    "expected_terms": [
+      "token",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/incident-token-observability",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-092-audience-dashboard",
+    "suite": "golden_candidate",
+    "question": "Why is a single local chunk insufficient to explain audience validation dashboards and gateway retry behavior?",
+    "expected_terms": [
+      "audience",
+      "validation",
+      "dashboard",
+      "retry"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/runbook-auth-trace"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-093-token-projection-rollout",
+    "suite": "golden_candidate",
+    "question": "Why is a single local chunk insufficient to explain bound token projection, validation rollout, and incident metrics?",
+    "expected_terms": [
+      "projection",
+      "validation",
+      "metrics",
+      "token"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-094-cache-distractor",
+    "suite": "golden_candidate",
+    "question": "Why is a single local chunk insufficient to explain gateway token cache tuning versus trace propagation failures?",
+    "expected_terms": [
+      "cache",
+      "gateway",
+      "trace",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-token-cache-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-095-sidecar-distractor",
+    "suite": "golden_candidate",
+    "question": "Why is a single local chunk insufficient to explain sidecar drain observability versus token audience failures?",
+    "expected_terms": [
+      "sidecar",
+      "shutdown",
+      "token",
+      "audience"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/sidecar-drain-observability",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/incident-token-observability"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-096-legacy-secret-cleanup",
+    "suite": "golden_candidate",
+    "question": "Why is a single local chunk insufficient to explain legacy secret cleanup versus bound service account token behavior?",
+    "expected_terms": [
+      "legacy",
+      "secret",
+      "bound",
+      "long-lived"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/legacy-secret-cleanup-distractor",
+      "builtin://kubernetes/kep-service-account-tokens"
+    ],
+    "expected_edge_types": [
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-097-trace-sampling-distractor",
+    "suite": "golden_candidate",
+    "question": "Why is a single local chunk insufficient to explain trace sampling policy versus fragmented gateway traces?",
+    "expected_terms": [
+      "sampling",
+      "fragmented",
+      "gateway",
+      "trace"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/trace-sampling-distractor",
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-098-runbook-correlation",
+    "suite": "golden_candidate",
+    "question": "Why is a single local chunk insufficient to explain runbook correlation across audience metrics, retry logs, and propagation tests?",
+    "expected_terms": [
+      "runbook",
+      "metrics",
+      "retry",
+      "propagation"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/runbook-auth-trace",
+      "builtin://synthetic/auth-audience-validation",
+      "builtin://synthetic/gateway-retry-context"
+    ],
+    "expected_edge_types": [
+      "portal",
+      "related_to"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-099-policy-to-observability",
+    "suite": "golden_candidate",
+    "question": "Why is a single local chunk insufficient to explain token policy crossing into observability investigation?",
+    "expected_terms": [
+      "token",
+      "policy",
+      "observability",
+      "incident"
+    ],
+    "expected_sources": [
+      "builtin://kubernetes/kep-service-account-tokens",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 2,
+    "audit_status": "candidate_needs_human_review"
+  },
+  {
+    "id": "golden100-100-gateway-boundary",
+    "suite": "golden_candidate",
+    "question": "Why is a single local chunk insufficient to explain gateway boundary behavior across authentication and propagation?",
+    "expected_terms": [
+      "gateway",
+      "authentication",
+      "propagation",
+      "boundary"
+    ],
+    "expected_sources": [
+      "builtin://synthetic/gateway-retry-context",
+      "builtin://synthetic/incident-token-observability",
+      "builtin://opentelemetry/context-propagation"
+    ],
+    "expected_edge_types": [
+      "portal"
+    ],
+    "hop_count_target": 3,
+    "audit_status": "candidate_needs_human_review"
+  }
+]
