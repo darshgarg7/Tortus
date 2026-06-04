@@ -79,6 +79,36 @@ Tortus targets knowledge systems where the answer depends on a path across conce
 
 ![Flat semantic space versus toroidal semantic space](assets/torus-boundary.svg)
 
+Tortus is a design-stage retrieval architecture for explainable, multi-hop RAG over large and federated knowledge bases.
+
+The core idea is simple: instead of treating knowledge as a flat set of embedded chunks, Tortus models it as a typed semantic graph embedded onto a soft toroidal manifold. Queries start with vector retrieval, then traverse concept edges, cross domain portals when needed, and return both an answer and the path that produced it.
+
+The bet: topology-aware traversal can improve multi-hop retrieval without turning retrieval into an unbounded agent loop.
+
+> Query concepts, not just chunks. Return reasoning paths, not just citations.
+
+## Status
+
+This repository is currently an architecture/specification draft. There is no implementation yet.
+
+The intended MVP is a local prototype that validates whether toroidal graph locality plus typed traversal improves multi-hop retrieval quality, explainability, and shard affinity compared with vector-only RAG, hybrid sparse+dense retrieval, and conventional GraphRAG baselines.
+
+## Problem
+
+Most production RAG systems are strong at retrieving nearby text and weak at preserving relationships between ideas. That creates recurring failures:
+
+| Failure mode | What happens | Why it matters |
+| --- | --- | --- |
+| Chunk blindness | The retriever finds relevant fragments but misses the conceptual path between them. | Answers become locally plausible and globally incomplete. |
+| Boundary artifacts | Clusters, domains, and shards create artificial edges in the knowledge space. | Cross-domain questions degrade exactly where synthesis is needed most. |
+| Weak provenance | Citations point to documents, but not to the reasoning path through concepts. | Users cannot audit why the system connected one fact to another. |
+| Prompt-hidden retrieval logic | Traversal policies live inside prompts or app code. | Developers cannot inspect, tune, or constrain retrieval behavior cleanly. |
+| Cost drift | Agentic search keeps expanding until a budget or timeout stops it. | Latency and LLM spend become difficult to predict. |
+
+Tortus targets knowledge systems where the answer depends on a path across concepts: engineering design history, policy reasoning, incident analysis, compliance research, product knowledge, and technical support.
+
+![Flat semantic space versus toroidal semantic space](assets/torus-boundary.svg)
+
 Flat partitions create artificial distance; toroidal wrapping preserves neighborhood continuity across boundaries.
 
 ## Core Hypothesis
@@ -312,6 +342,38 @@ Remaining work for a publishable v1:
 - manually audit and revise the 100-question candidate golden set
 - profile real API-backed embedding and synthesis cost
 
+```text
+score(next) =
+  semantic_similarity(query, next)
+  + edge_weight(current, next)
+  + evidence_quality(next)
+  + freshness_bias(next)
+  - traversal_cost(next)
+  - uncertainty_penalty(next)
+```
+
+The exact scoring function is intentionally replaceable. The MVP should make retrieval policies easy to compare rather than hard-coding one strategy.
+
+## Evaluation Plan
+
+Tortus should be judged by evidence, not novelty language.
+
+| Dimension | Metrics |
+| --- | --- |
+| Retrieval quality | recall@k, multi-hop path recall, answer faithfulness, contradiction rate |
+| Path quality | hop precision, evidence coverage, path minimality, human audit score |
+| System performance | p50/p95 latency, shard fanout, cache hit rate, index update cost |
+| Cost control | tokens per answered query, LLM calls per query, timeout rate |
+| Federation | cross-subgraph success rate, partial-answer quality, failover rate |
+
+Required baselines:
+
+- vector-only RAG
+- BM25 plus dense hybrid retrieval
+- conventional knowledge graph lookup
+- GraphRAG-style community summaries
+- agentic search with tool calls
+
 The project is successful only if it can show a measurable improvement for questions that require concept paths, while staying competitive on latency and cost.
 
 ## MVP Scope
@@ -413,6 +475,75 @@ Created by Darsh Garg.
 - GitHub: `darshgarg7`
 - Email: `darsh.garg@gmail.com`
 
+
+| Phase | Deliverable |
+| --- | --- |
+| 0 | Finalize schema, traversal interfaces, and evaluation dataset. |
+| 1 | Build a local graph index over a small technical-document corpus. |
+| 2 | Add toroidal coordinates, ANN seeding, and typed edge traversal. |
+| 3 | Expose GraphQL query directives and reasoning-path responses. |
+| 4 | Run baseline comparisons and publish results. |
+| 5 | Add portal hops and topology-aware sharding if earlier phases justify them. |
+
+Planned repository shape:
+
+```text
+src/
+  ingest/        document parsing, chunking, concept extraction
+  graph/         nodes, edges, evidence spans, memberships
+  embedding/     vector and toroidal coordinate generation
+  traversal/     policies, scoring, portal hops
+  api/           GraphQL schema and resolvers
+  eval/          datasets, baselines, metrics
+docs/
+  architecture.md
+  evaluation.md
+```
+
+## Design Principles
+
+- Make retrieval inspectable before making it clever.
+- Treat LLMs as synthesis and policy helpers, not as hidden databases.
+- Return evidence paths for claims that cross concepts.
+- Put budgets in the API, not only in deployment config.
+- Prefer replaceable retrieval policies over one monolithic agent loop.
+- Measure against boring baselines before adding exotic machinery.
+
+## Potential Use Cases
+
+| Domain | Example |
+| --- | --- |
+| Engineering knowledge | Trace why an API, architecture decision, or reliability pattern changed over time. |
+| Support policy reasoning | Connect customer symptoms, policy rules, exceptions, and historical resolutions. |
+| Compliance and governance | Traverse regulation, internal controls, audits, and model behavior evidence. |
+| Research synthesis | Connect papers, claims, datasets, contradictions, and follow-up questions. |
+| Private knowledge assistants | Run local or tenant-scoped concept traversal with explicit privacy controls. |
+
+## Risks and Open Questions
+
+| Risk | Why it matters | Mitigation |
+| --- | --- | --- |
+| Toroidal layout may not outperform simpler embeddings. | The central topology claim needs proof. | Keep layout pluggable and run direct ablations. |
+| Concept extraction can create noisy nodes and edges. | Bad graph structure harms traversal quality. | Track edge provenance and confidence; support pruning. |
+| LLM-guided traversal may overfit to plausible paths. | Explanations can become narrative instead of evidence. | Require evidence spans for returned hops. |
+| GraphQL directives can become too complex. | Developer ergonomics matter for adoption. | Start with a minimal directive set and add only measured needs. |
+| Federation can increase latency. | Cross-domain search is expensive. | Enforce hop, shard, time, and token budgets at query time. |
+
+## Research Extensions
+
+- learned edge traversal policies
+- contrastive refinement of graph and toroidal embeddings
+- path-aware reranking
+- visual graph debugger for retrieval traces
+- self-healing schema federation
+- privacy-preserving local subgraphs
+
+## Author
+
+Created by Darsh Garg.
+
+- GitHub: `darshgarg7`
+- Email: `darsh.garg@gmail.com`
 ## License
 
 MIT. Use freely for educational, research, and portfolio purposes.
