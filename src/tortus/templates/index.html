@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Topology-aware retrieval lab</p>
+          <h1>Tortus Query Lab</h1>
+        </div>
+        <div class="status-pill">
+          <span class="pulse"></span>
+          Local v0 benchmark
+        </div>
+      </header>
+
+      <section class="hero-grid">
+        <section class="panel query-panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Query</p>
+              <h2>Boundary-crossing retrieval</h2>
+            </div>
+            <button id="run-query" class="primary-button" type="button">Run</button>
+          </div>
+          <textarea id="query-input" spellcheck="false">{{ default_query }}</textarea>
+          <div id="warnings" class="warnings"></div>
+          <p id="answer" class="answer">Run a query to inspect the retrieved answer path.</p>
+          <div id="budget" class="metric-grid"></div>
+        </section>
+
+        <section class="panel chart-panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Torus map</p>
+              <h2>Semantic coordinates</h2>
+            </div>
+            <div class="legend">
+              <span class="legend-line"></span>
+              highlighted path
+            </div>
+          </div>
+          <div id="torus-chart" class="plot"></div>
+        </section>
+      </section>
+
+      <section class="content-grid">
+        <section class="panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Evidence path</p>
+              <h2>Reasoning hops</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Edge</th>
+                  <th>Weight</th>
+                </tr>
+              </thead>
+              <tbody id="path-table">
+                <tr><td colspan="4" class="muted">No query has been run yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Benchmarks</p>
+              <h2>Eval comparison</h2>
+            </div>
+          </div>
+          <div id="eval-cards" class="comparison-grid"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Strategy</th>
+                  <th>Pass</th>
+                  <th>Source</th>
+                  <th>Path</th>
+                  <th>Fanout</th>
+                </tr>
+              </thead>
+              <tbody id="eval-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="panel evidence-panel">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Grounding</p>
+            <h2>Selected evidence</h2>
+          </div>
+        </div>
+        <div id="evidence-list" class="evidence-list">
+          <p class="muted">Evidence spans will appear after the first query.</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="{{ url_for('static', path='/app.js') }}"></script>
+  </body>
+</html>
