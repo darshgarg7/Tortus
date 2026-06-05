@@ -23,8 +23,8 @@ console = Console()
 
 
 @app.command()
-def ingest(corpus: str = typer.Option("engineering", help="Corpus name to ingest.")) -> None:
-    """Ingest ingest."""
+def ingest(corpus: str | None = typer.Option(None, help="Corpus name to ingest.")) -> None:
+    """Ingest a built-in corpus snapshot."""
     settings = get_settings()
     documents, chunks = ingest_builtin(settings, corpus=corpus)
     corpus_dir = data_paths(settings)["corpus"]
@@ -32,12 +32,15 @@ def ingest(corpus: str = typer.Option("engineering", help="Corpus name to ingest
 
 
 @app.command()
-def index(layout: str = typer.Option("torus", help="Layout to build: torus.")) -> None:
+def index(
+    layout: str = typer.Option("torus", help="Layout to build: torus."),
+    corpus: str | None = typer.Option(None, help="Corpus name to index."),
+) -> None:
     """Build index."""
     if layout != "torus":
-        raise typer.BadParameter("only the torus layout is implemented in v0")
+        raise typer.BadParameter("only the torus layout is implemented in v1")
     settings = get_settings()
-    stats = build_index(settings)
+    stats = build_index(settings, corpus=corpus)
     console.print("Built Tortus index")
     console.print_json(json.dumps(stats))
 
@@ -49,7 +52,7 @@ def query(
     max_hops: int = typer.Option(3, help="Traversal hop budget."),
     local_only: bool = typer.Option(False, help="Disable portal hops."),
 ) -> None:
-    """Query query."""
+    """Run a query against the local Tortus engine."""
     engine = load_engine(get_settings())
     result = engine.answer(
         text,
@@ -82,7 +85,7 @@ def eval_command(
         typer.Option(help="Optional DuckDB path for eval rows."),
     ] = None,
 ) -> None:
-    """Build eval command."""
+    """Run an evaluation suite."""
     try:
         questions_for_suite(suite)
     except ValueError as exc:
@@ -145,7 +148,7 @@ def report_command(
         typer.Option(help="Output markdown report."),
     ] = Path("data/reports/eval-report.md"),
 ) -> None:
-    """Return report command."""
+    """Generate a markdown report from an eval JSON file."""
     if not eval_json.exists():
         raise typer.BadParameter(f"eval report does not exist: {eval_json}")
     report = EvalReport.model_validate_json(eval_json.read_text(encoding="utf-8"))
@@ -158,11 +161,11 @@ def report_command(
 def golden_set_command(
     out: Annotated[
         Path,
-        typer.Option(help="Output JSON path for candidate golden questions."),
+        typer.Option(help="Output JSON path for curated golden questions."),
     ] = Path("data/golden_set.json"),
     count: int = typer.Option(100, help="Number of candidate questions to generate."),
 ) -> None:
-    """Generate golden set command."""
+    """Generate the deterministic curated golden set."""
     write_candidate_golden_set(out, count=count)
     console.print(f"wrote_golden_set={out} count={count}")
 
@@ -172,12 +175,12 @@ def serve(
     host: str = typer.Option("127.0.0.1", help="Host to bind."),
     port: int = typer.Option(8000, help="Port to bind."),
 ) -> None:
-    """Serve serve."""
+    """Serve the GraphQL API and dashboard."""
     uvicorn.run(create_app(), host=host, port=port)
 
 
 @app.command()
 def paths() -> None:
-    """Print paths."""
+    """Print the active Tortus data paths."""
     for name, path in data_paths(get_settings()).items():
         console.print(f"{name}: {Path(path)}")

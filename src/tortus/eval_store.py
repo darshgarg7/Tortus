@@ -9,13 +9,13 @@ from .eval import EvalReport
 
 
 def write_eval_json(report: EvalReport, path: Path) -> None:
-    """Write write eval json."""
+    """Write an evaluation report to JSON."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(report.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
 
 def write_eval_duckdb(report: EvalReport, path: Path) -> str:
-    """Write write eval duckdb."""
+    """Persist an evaluation report to a DuckDB results database."""
     path.parent.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%S%fZ")
     with duckdb.connect(str(path)) as connection:
@@ -38,6 +38,8 @@ def write_eval_duckdb(report: EvalReport, path: Path) -> str:
                 term_recall DOUBLE NOT NULL,
                 source_recall DOUBLE NOT NULL,
                 path_recall DOUBLE NOT NULL DEFAULT 0,
+                path_precision DOUBLE NOT NULL DEFAULT 0,
+                faithfulness DOUBLE NOT NULL DEFAULT 0,
                 latency_ms DOUBLE NOT NULL,
                 nodes_visited INTEGER NOT NULL,
                 hops_taken INTEGER NOT NULL,
@@ -46,6 +48,7 @@ def write_eval_duckdb(report: EvalReport, path: Path) -> str:
                 shard_crossings INTEGER NOT NULL DEFAULT 0,
                 tokens_estimated INTEGER NOT NULL,
                 path_edge_types TEXT NOT NULL DEFAULT '',
+                expect_answer BOOLEAN NOT NULL DEFAULT TRUE,
                 warnings TEXT NOT NULL
             )
             """
@@ -55,6 +58,15 @@ def write_eval_duckdb(report: EvalReport, path: Path) -> str:
         )
         connection.execute(
             "ALTER TABLE eval_rows ADD COLUMN IF NOT EXISTS path_edge_types TEXT DEFAULT ''"
+        )
+        connection.execute(
+            "ALTER TABLE eval_rows ADD COLUMN IF NOT EXISTS path_precision DOUBLE DEFAULT 0"
+        )
+        connection.execute(
+            "ALTER TABLE eval_rows ADD COLUMN IF NOT EXISTS faithfulness DOUBLE DEFAULT 0"
+        )
+        connection.execute(
+            "ALTER TABLE eval_rows ADD COLUMN IF NOT EXISTS expect_answer BOOLEAN DEFAULT TRUE"
         )
         connection.execute(
             "ALTER TABLE eval_rows ADD COLUMN IF NOT EXISTS portal_hops INTEGER DEFAULT 0"
@@ -76,6 +88,8 @@ def write_eval_duckdb(report: EvalReport, path: Path) -> str:
                 term_recall,
                 source_recall,
                 path_recall,
+                path_precision,
+                faithfulness,
                 latency_ms,
                 nodes_visited,
                 hops_taken,
@@ -84,10 +98,11 @@ def write_eval_duckdb(report: EvalReport, path: Path) -> str:
                 shard_crossings,
                 tokens_estimated,
                 path_edge_types,
+                expect_answer,
                 warnings
             )
             VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
             """,
             [
@@ -99,6 +114,8 @@ def write_eval_duckdb(report: EvalReport, path: Path) -> str:
                     row.term_recall,
                     row.source_recall,
                     row.path_recall,
+                    row.path_precision,
+                    row.faithfulness,
                     row.latency_ms,
                     row.nodes_visited,
                     row.hops_taken,
@@ -106,7 +123,8 @@ def write_eval_duckdb(report: EvalReport, path: Path) -> str:
                     row.shard_fanout,
                     row.shard_crossings,
                     row.tokens_estimated,
-                    "",
+                    ",".join(row.path_edge_types),
+                    row.expect_answer,
                     "; ".join(row.warnings),
                 ]
                 for row in report.rows

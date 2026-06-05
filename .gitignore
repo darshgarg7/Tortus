@@ -16,6 +16,8 @@ build/
 data/*
 !data/.gitkeep
 !data/golden_set.json
+!data/benchmark_snapshots/
+!data/benchmark_snapshots/*.json
 !data/reports/
 !data/reports/eval-report.md
 .tortus_cache/

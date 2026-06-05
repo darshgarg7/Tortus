@@ -23,11 +23,13 @@ class Settings(BaseSettings):
     )
 
     tortus_llm_model: str = Field(default="gpt-4.1", alias="TORTUS_LLM_MODEL")
+    tortus_corpus: str = Field(default="public-engineering", alias="TORTUS_CORPUS")
     tortus_embedding_provider: str = Field(default="local", alias="TORTUS_EMBEDDING_PROVIDER")
     tortus_embedding_model: str = Field(
         default="text-embedding-3-large",
         alias="TORTUS_EMBEDDING_MODEL",
     )
+    tortus_vector_backend: str = Field(default="exact", alias="TORTUS_VECTOR_BACKEND")
     tortus_data_dir: Path = Field(default=Path("data"), alias="TORTUS_DATA_DIR")
     tortus_cache_dir: Path = Field(default=Path(".tortus_cache"), alias="TORTUS_CACHE_DIR")
 

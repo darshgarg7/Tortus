@@ -85,6 +85,7 @@ class Chunk(BaseModel):
     text: str
     evidence: EvidenceSpan
     ordinal: int = Field(ge=0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class SubgraphMembership(BaseModel):
@@ -114,6 +115,7 @@ class ConceptNode(BaseModel):
     evidence: list[EvidenceSpan] = Field(default_factory=list)
     torus: TorusCoordinate | None = None
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class SemanticEdge(BaseModel):
@@ -157,6 +159,8 @@ class SearchHit(BaseModel):
     label: str
     score: float
     evidence: list[EvidenceSpan] = Field(default_factory=list)
+    matched_terms: list[str] = Field(default_factory=list)
+    score_components: dict[str, float] = Field(default_factory=dict)
 
 
 class ReasoningHop(BaseModel):
@@ -167,6 +171,11 @@ class ReasoningHop(BaseModel):
     edge_type: EdgeType
     weight: float
     evidence: list[EvidenceSpan] = Field(default_factory=list)
+    score: float = 0.0
+    reason: str = ""
+    matched_terms: list[str] = Field(default_factory=list)
+    torus_distance: float | None = None
+    score_components: dict[str, float] = Field(default_factory=dict)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -181,6 +190,10 @@ class BudgetStats(BaseModel):
     shard_fanout: int = 0
     shard_crossings: int = 0
     tokens_estimated: int
+    candidates_considered: int = 0
+    pruned_edges: int = 0
+    portal_candidates: int = 0
+    lexical_support: int = 0
     truncated: bool = False
 
 
@@ -202,3 +215,4 @@ class AnswerResult(BaseModel):
     budget: BudgetStats
     warnings: list[str] = Field(default_factory=list)
     baseline_comparison: list[BaselineComparison] = Field(default_factory=list)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)

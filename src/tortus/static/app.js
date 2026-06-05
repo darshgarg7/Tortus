@@ -181,9 +181,13 @@ async function runQuery() {
               shardFanout
               shardCrossings
               tokensEstimated
+              candidatesConsidered
+              prunedEdges
+              portalCandidates
+              lexicalSupport
               truncated
             }
-            reasoningPath { fromNode toNode edgeType weight }
+            reasoningPath { fromNode toNode edgeType weight score reason matchedTerms torusDistance }
             evidence { uri start end text }
           }
         }`,
@@ -211,6 +215,9 @@ function renderAnswer(result) {
     ["fanout", result.budget.shardFanout],
     ["cross", result.budget.shardCrossings],
     ["tokens", result.budget.tokensEstimated],
+    ["candidates", result.budget.candidatesConsidered],
+    ["pruned", result.budget.prunedEdges],
+    ["support", result.budget.lexicalSupport],
     ["ms", formatNumber(result.budget.elapsedMs, 1)],
   ]
     .map(
@@ -232,6 +239,9 @@ function renderAnswer(result) {
           <td>${escapeHtml(shortId(hop.toNode))}</td>
           <td>${escapeHtml(hop.edgeType)}</td>
           <td>${formatNumber(hop.weight)}</td>
+          <td>${formatNumber(hop.score)}</td>
+          <td>${escapeHtml((hop.matchedTerms || []).join(", "))}</td>
+          <td>${escapeHtml(hop.reason || "")}</td>
         </tr>
       `,
     )

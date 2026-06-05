@@ -1,7 +1,6 @@
 """Baseline retrieval strategies for Tortus evaluation."""
 
 import math
-import re
 import time
 from collections import Counter
 from hashlib import sha1
@@ -19,26 +18,9 @@ from .models import (
     TraversalPolicy,
 )
 from .sharding import ToroidalShardSimulator
+from .text import tokenize
 from .torus import torus_distance
-from .traversal import QueryEngine, dedupe_evidence, estimate_tokens
-
-TOKEN_RE = re.compile(r"[a-z][a-z0-9-]{2,}")
-STOPWORDS = {
-    "and",
-    "are",
-    "because",
-    "from",
-    "have",
-    "into",
-    "that",
-    "the",
-    "this",
-    "with",
-    "while",
-    "why",
-    "how",
-    "did",
-}
+from .traversal import QueryEngine, dedupe_evidence, estimate_tokens, synthesize_evidence_answer
 
 STRATEGIES = (
     "tortus_torus",
@@ -55,11 +37,12 @@ STRATEGIES = (
 
 
 class StrategyRun(BaseModel):
-    """Represent StrategyRun data."""
+    """Result payload for one baseline or Tortus strategy run."""
 
     strategy: str
     hits: list[SearchHit] = Field(default_factory=list)
     evidence: list[EvidenceSpan] = Field(default_factory=list)
+    answer: str = ""
     latency_ms: float
     nodes_visited: int
     hops_taken: int
@@ -78,7 +61,7 @@ def run_strategy(
     policy: TraversalPolicy,
     top_k: int = 5,
 ) -> StrategyRun:
-    """Run run strategy."""
+    """Dispatch a retrieval strategy by name."""
     if strategy == "tortus_torus":
         return run_tortus(engine, query, policy)
     if strategy == "vector_only":
@@ -113,7 +96,7 @@ def run_tortus(
     policy: TraversalPolicy,
     strategy: str = "tortus_torus",
 ) -> StrategyRun:
-    """Run run tortus."""
+    """Run the Tortus graph traversal strategy."""
     started = time.perf_counter()
     result = engine.answer(query, policy=policy)
     latency_ms = (time.perf_counter() - started) * 1000
@@ -123,6 +106,7 @@ def run_tortus(
         strategy=strategy,
         hits=[],
         evidence=result.evidence,
+        answer=result.answer,
         latency_ms=latency_ms,
         nodes_visited=result.budget.nodes_visited,
         hops_taken=result.budget.hops_taken,
@@ -136,7 +120,7 @@ def run_tortus(
 
 
 def run_vector_only(engine: QueryEngine, query: str, top_k: int = 5) -> StrategyRun:
-    """Run run vector only."""
+    """Run dense retrieval without graph traversal."""
     started = time.perf_counter()
     query_vector = engine.embeddings.embed([query])[0]
     hits = attach_evidence(engine.graph, engine.index.search(query_vector, top_k=top_k))
@@ -146,6 +130,7 @@ def run_vector_only(engine: QueryEngine, query: str, top_k: int = 5) -> Strategy
         strategy="vector_only",
         hits=hits,
         evidence=evidence,
+        answer=synthesize_evidence_answer(query, hits, evidence).answer,
         latency_ms=latency_ms,
         nodes_visited=len(hits),
         hops_taken=0,
@@ -155,7 +140,7 @@ def run_vector_only(engine: QueryEngine, query: str, top_k: int = 5) -> Strategy
 
 
 def run_bm25(graph: GraphStore, query: str, top_k: int = 5) -> StrategyRun:
-    """Run run bm25."""
+    """Run a lexical BM25 baseline over concept nodes."""
     started = time.perf_counter()
     nodes = graph.list_nodes()
     query_terms = tokenize(query)
@@ -171,6 +156,7 @@ def run_bm25(graph: GraphStore, query: str, top_k: int = 5) -> StrategyRun:
         strategy="bm25",
         hits=hits,
         evidence=evidence,
+        answer=synthesize_evidence_answer(query, hits, evidence).answer,
         latency_ms=latency_ms,
         nodes_visited=len(hits),
         hops_taken=0,
@@ -181,7 +167,7 @@ def run_bm25(graph: GraphStore, query: str, top_k: int = 5) -> StrategyRun:
 
 
 def run_hybrid_dense_bm25(engine: QueryEngine, query: str, top_k: int = 5) -> StrategyRun:
-    """Run run hybrid dense bm25."""
+    """Run a weighted dense plus BM25 hybrid retrieval baseline."""
     started = time.perf_counter()
     nodes = engine.graph.list_nodes()
     query_vector = engine.embeddings.embed([query])[0]
@@ -211,6 +197,7 @@ def run_hybrid_dense_bm25(engine: QueryEngine, query: str, top_k: int = 5) -> St
         strategy="hybrid_dense_bm25",
         hits=hits,
         evidence=evidence,
+        answer=synthesize_evidence_answer(query, hits, evidence).answer,
         latency_ms=(time.perf_counter() - started) * 1000,
         nodes_visited=len(hits),
         hops_taken=0,
@@ -220,7 +207,7 @@ def run_hybrid_dense_bm25(engine: QueryEngine, query: str, top_k: int = 5) -> St
 
 
 def run_community_summary(engine: QueryEngine, query: str, top_k: int = 5) -> StrategyRun:
-    """Run run community summary."""
+    """Run a local community-summary-style retrieval approximation."""
     started = time.perf_counter()
     nodes = engine.graph.list_nodes()
     query_terms = tokenize(query)
@@ -247,6 +234,7 @@ def run_community_summary(engine: QueryEngine, query: str, top_k: int = 5) -> St
         strategy="community_summary",
         hits=hits,
         evidence=evidence,
+        answer=synthesize_evidence_answer(query, hits, evidence).answer,
         latency_ms=(time.perf_counter() - started) * 1000,
         nodes_visited=len(deduped_nodes),
         hops_taken=0,
@@ -262,7 +250,7 @@ def run_bounded_agentic(
     policy: TraversalPolicy,
     top_k: int = 5,
 ) -> StrategyRun:
-    """Run run bounded agentic."""
+    """Run a deterministic bounded-agentic search approximation."""
     started = time.perf_counter()
     query_vector = engine.embeddings.embed([query])[0]
     dense_hits = engine.index.search(query_vector, top_k=2)
@@ -331,6 +319,7 @@ def run_bounded_agentic(
         strategy="bounded_agentic",
         hits=visited_hits,
         evidence=evidence[:10],
+        answer=synthesize_evidence_answer(query, visited_hits, evidence).answer,
         latency_ms=(time.perf_counter() - started) * 1000,
         nodes_visited=len(visited),
         hops_taken=len(hops),
@@ -349,7 +338,7 @@ def run_layout_probe(
     distance: str,
     top_k: int = 5,
 ) -> StrategyRun:
-    """Run run layout probe."""
+    """Run a layout-distance retrieval probe."""
     started = time.perf_counter()
     query_vector = engine.embeddings.embed([query])[0]
     seed_hits = engine.index.search(query_vector, top_k=1)
@@ -375,6 +364,7 @@ def run_layout_probe(
         strategy=f"{distance}_layout",
         hits=hits,
         evidence=evidence,
+        answer=synthesize_evidence_answer(query, hits, evidence).answer,
         latency_ms=(time.perf_counter() - started) * 1000,
         nodes_visited=len(hits),
         hops_taken=0,
@@ -412,7 +402,7 @@ def rank_by_layout(
 
 
 def score_bm25(nodes: list[ConceptNode], query_terms: list[str]) -> list[tuple[ConceptNode, float]]:
-    """Score score bm25."""
+    """Score concept nodes with a compact BM25 implementation."""
     if not nodes:
         return []
     documents = [tokenize(node.label + " " + node.text) for node in nodes]
@@ -436,11 +426,6 @@ def score_bm25(nodes: list[ConceptNode], query_terms: list[str]) -> list[tuple[C
             score += idf * (frequency * (k1 + 1)) / denominator
         scored.append((node, score))
     return sorted(scored, key=lambda item: item[1], reverse=True)
-
-
-def tokenize(text: str) -> list[str]:
-    """Tokenize tokenize."""
-    return [token for token in TOKEN_RE.findall(text.lower()) if token not in STOPWORDS]
 
 
 def attach_evidence(graph: GraphStore, hits: list[SearchHit]) -> list[SearchHit]:
@@ -475,7 +460,7 @@ def domains_for_hops(graph: GraphStore, node_ids: list[str]) -> set[str]:
 
 
 def normalize_scores(scores: dict[str, float]) -> dict[str, float]:
-    """Normalize normalize scores."""
+    """Normalize arbitrary scores into the [0, 1] range."""
     if not scores:
         return {}
     minimum = min(scores.values())
@@ -486,7 +471,7 @@ def normalize_scores(scores: dict[str, float]) -> dict[str, float]:
 
 
 def group_nodes_by_domain(nodes: list[ConceptNode]) -> dict[str, list[ConceptNode]]:
-    """Group group nodes by domain."""
+    """Group concept nodes by their primary domain membership."""
     grouped: dict[str, list[ConceptNode]] = {}
     for node in nodes:
         domain = node.memberships[0].subgraph if node.memberships else "unknown"
@@ -495,7 +480,7 @@ def group_nodes_by_domain(nodes: list[ConceptNode]) -> dict[str, list[ConceptNod
 
 
 def dedupe_nodes(nodes: list[ConceptNode]) -> list[ConceptNode]:
-    """Deduplicate dedupe nodes."""
+    """Deduplicate nodes while preserving rank order."""
     seen: set[str] = set()
     deduped: list[ConceptNode] = []
     for node in nodes:

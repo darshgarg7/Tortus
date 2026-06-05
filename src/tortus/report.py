@@ -10,13 +10,15 @@ from .eval import EvalReport, EvalRow
 
 
 class StrategySummary(BaseModel):
-    """Represent StrategySummary data."""
+    """Aggregate metrics for one retrieval strategy."""
 
     strategy: str
     pass_rate: float
     term_recall: float
     source_recall: float
     path_recall: float
+    path_precision: float
+    faithfulness: float
     p50_latency_ms: float
     p95_latency_ms: float
     mean_nodes_visited: float
@@ -42,6 +44,8 @@ def strategy_summaries(report: EvalReport) -> list[StrategySummary]:
                 term_recall=average([row.term_recall for row in rows]),
                 source_recall=average([row.source_recall for row in rows]),
                 path_recall=average([row.path_recall for row in rows]),
+                path_precision=average([row.path_precision for row in rows]),
+                faithfulness=average([row.faithfulness for row in rows]),
                 p50_latency_ms=percentile([row.latency_ms for row in rows], 0.50),
                 p95_latency_ms=percentile([row.latency_ms for row in rows], 0.95),
                 mean_nodes_visited=average([float(row.nodes_visited) for row in rows]),
@@ -69,7 +73,7 @@ def failure_taxonomy(report: EvalReport) -> Counter[str]:
 
 
 def generate_markdown_report(report: EvalReport) -> str:
-    """Generate generate markdown report."""
+    """Generate a markdown benchmark report."""
     summaries = strategy_summaries(report)
     taxonomy = failure_taxonomy(report)
     failed_rows = sorted(
@@ -87,8 +91,9 @@ def generate_markdown_report(report: EvalReport) -> str:
         (
             f"Suite: `{report.suite}`. Rows: `{len(report.rows)}`. "
             "A pass requires term recall >= 0.50, source recall >= 0.50, "
-            "and path recall >= 0.50. This is a local v0 benchmark, not a "
-            "production superiority claim."
+            "path recall >= 0.50, and faithfulness >= 0.50 for answerable questions. "
+            "Negative questions pass only when unsupported answers are withheld. "
+            "This is a local v1 benchmark, not a production superiority claim."
         ),
         "",
         "## Strategy Summary",
@@ -100,6 +105,8 @@ def generate_markdown_report(report: EvalReport) -> str:
                 "term",
                 "source",
                 "path",
+                "precision",
+                "faith",
                 "p50 ms",
                 "p95 ms",
                 "nodes",
@@ -115,6 +122,8 @@ def generate_markdown_report(report: EvalReport) -> str:
                     f"{summary.term_recall:.2f}",
                     f"{summary.source_recall:.2f}",
                     f"{summary.path_recall:.2f}",
+                    f"{summary.path_precision:.2f}",
+                    f"{summary.faithfulness:.2f}",
                     f"{summary.p50_latency_ms:.1f}",
                     f"{summary.p95_latency_ms:.1f}",
                     f"{summary.mean_nodes_visited:.1f}",
@@ -168,7 +177,7 @@ def generate_markdown_report(report: EvalReport) -> str:
 
 
 def classify_row(row: EvalRow) -> list[str]:
-    """Classify classify row."""
+    """Classify a failed eval row for the failure taxonomy."""
     labels: list[str] = []
     if row.term_recall <= 0:
         labels.append("missing_expected_terms")
@@ -176,6 +185,10 @@ def classify_row(row: EvalRow) -> list[str]:
         labels.append("missing_expected_sources")
     if row.path_recall <= 0:
         labels.append("missing_expected_path")
+    if row.path_precision < 0.5 and row.hops_taken:
+        labels.append("low_path_precision")
+    if row.faithfulness < 0.5:
+        labels.append("low_faithfulness")
     lowered_warnings = " ".join(row.warnings).lower()
     if "budget" in lowered_warnings:
         labels.append("budget_limited")
@@ -187,7 +200,7 @@ def classify_row(row: EvalRow) -> list[str]:
 
 
 def thesis_check(summaries: list[StrategySummary]) -> str:
-    """Summarize thesis check."""
+    """Compare Tortus against the strongest current baseline."""
     tortus = next((summary for summary in summaries if summary.strategy == "tortus_torus"), None)
     baselines = [summary for summary in summaries if summary.strategy != "tortus_torus"]
     if tortus is None:
@@ -207,37 +220,41 @@ def thesis_check(summaries: list[StrategySummary]) -> str:
     pass_delta = tortus.pass_rate - best.pass_rate
     source_delta = tortus.source_recall - best.source_recall
     path_delta = tortus.path_recall - best.path_recall
+    faith_delta = tortus.faithfulness - best.faithfulness
 
     if pass_delta > 0:
-        verdict = "v0 supports keeping the toroidal traversal hypothesis alive"
+        verdict = "v1 supports keeping the toroidal traversal hypothesis alive"
     elif pass_delta == 0:
-        verdict = "v0 is inconclusive on pass rate"
+        verdict = "v1 is inconclusive on pass rate"
     else:
-        verdict = "v0 is a negative result for the current toroidal traversal policy"
+        verdict = "v1 is a negative result for the current toroidal traversal policy"
 
     return (
         f"{verdict}: `tortus_torus` is {pass_delta:+.2f} pass-rate points, "
         f"{source_delta:+.2f} source-recall points, and {path_delta:+.2f} "
-        f"path-recall points versus the strongest current baseline "
+        f"path-recall points, and {faith_delta:+.2f} faithfulness points versus the "
+        "strongest current baseline "
         f"(`{best.strategy}`)."
     )
 
 
 def boundary_crossing_summary(report: EvalReport) -> str:
-    """Summarize boundary crossing summary."""
+    """Summarize behavior on boundary-crossing questions."""
     rows = [row for row in report.rows if row.suite == "boundary_crossing"]
     if not rows:
         return "No boundary-crossing questions were included in this report."
     slice_report = EvalReport(suite="boundary_crossing", rows=rows)
     summaries = strategy_summaries(slice_report)
     return markdown_table(
-        ["strategy", "pass", "source", "path", "portals", "fanout", "cross"],
+        ["strategy", "pass", "source", "path", "precision", "faith", "portals", "fanout", "cross"],
         [
             [
                 summary.strategy,
                 f"{summary.pass_rate:.2f}",
                 f"{summary.source_recall:.2f}",
                 f"{summary.path_recall:.2f}",
+                f"{summary.path_precision:.2f}",
+                f"{summary.faithfulness:.2f}",
                 f"{summary.mean_portal_hops:.1f}",
                 f"{summary.mean_shard_fanout:.1f}",
                 f"{summary.mean_shard_crossings:.1f}",
@@ -248,7 +265,7 @@ def boundary_crossing_summary(report: EvalReport) -> str:
 
 
 def suite_breakdown_summary(report: EvalReport) -> str:
-    """Summarize suite breakdown summary."""
+    """Summarize strategy performance by suite."""
     suites = sorted({row.suite for row in report.rows})
     if not suites:
         return "No suite rows were recorded."
@@ -264,14 +281,19 @@ def suite_breakdown_summary(report: EvalReport) -> str:
                     f"{summary.pass_rate:.2f}",
                     f"{summary.source_recall:.2f}",
                     f"{summary.path_recall:.2f}",
+                    f"{summary.path_precision:.2f}",
+                    f"{summary.faithfulness:.2f}",
                     f"{summary.p95_latency_ms:.1f}",
                 ]
             )
-    return markdown_table(["suite", "strategy", "pass", "source", "path", "p95 ms"], rows)
+    return markdown_table(
+        ["suite", "strategy", "pass", "source", "path", "precision", "faith", "p95 ms"],
+        rows,
+    )
 
 
 def taxonomy_summary(taxonomy: Counter[str]) -> str:
-    """Summarize taxonomy summary."""
+    """Render the failure taxonomy."""
     if not taxonomy:
         return "No failures or warnings were recorded."
     return markdown_table(
@@ -297,11 +319,11 @@ def cost_and_fanout_notes(summaries: list[StrategySummary]) -> str:
 
 
 def hardest_misses_summary(rows: list[EvalRow], limit: int = 8) -> str:
-    """Summarize hardest misses summary."""
+    """Render the lowest-scoring eval rows."""
     if not rows:
         return "No failing eval rows were recorded."
     return markdown_table(
-        ["question", "strategy", "term", "source", "path", "warnings"],
+        ["question", "strategy", "term", "source", "path", "precision", "faith", "warnings"],
         [
             [
                 row.question_id,
@@ -309,6 +331,8 @@ def hardest_misses_summary(rows: list[EvalRow], limit: int = 8) -> str:
                 f"{row.term_recall:.2f}",
                 f"{row.source_recall:.2f}",
                 f"{row.path_recall:.2f}",
+                f"{row.path_precision:.2f}",
+                f"{row.faithfulness:.2f}",
                 "; ".join(row.warnings) if row.warnings else "",
             ]
             for row in rows[:limit]
@@ -329,7 +353,7 @@ def markdown_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str
 
 
 def clean_cell(value: str) -> str:
-    """Clean clean cell."""
+    """Escape markdown table cell text."""
     return value.replace("|", "\\|").replace("\n", " ")
 
 

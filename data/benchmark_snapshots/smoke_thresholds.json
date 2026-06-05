@@ -1,0 +1,17 @@
+{
+  "suite": "smoke",
+  "corpus": "public-engineering",
+  "strategies": {
+    "tortus_torus": {
+      "min_pass_rate": 0.66,
+      "min_faithfulness": 0.50,
+      "max_mean_portal_hops": 8.0
+    },
+    "vector_only": {
+      "min_source_recall": 0.50
+    },
+    "bm25": {
+      "min_source_recall": 0.50
+    }
+  }
+}

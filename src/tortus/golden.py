@@ -144,7 +144,13 @@ QUESTION_TEMPLATES = (
 
 
 def generate_candidate_golden_set(count: int = 100) -> list[dict[str, Any]]:
-    """Generate deterministic candidate golden questions with source URI labels."""
+    """Generate deterministic curated questions with source URI labels.
+
+    The rows are stronger than raw candidates because each scenario carries expected
+    sources and path labels, but they intentionally require maintainer signoff.
+    A project maintainer should review and flip `audit_status` before using them as
+    publishable benchmark evidence.
+    """
     rows: list[dict[str, Any]] = []
     for index in range(count):
         scenario = SCENARIOS[index % len(SCENARIOS)]
@@ -158,14 +164,19 @@ def generate_candidate_golden_set(count: int = 100) -> list[dict[str, Any]]:
                 "expected_sources": list(scenario.expected_sources),
                 "expected_edge_types": list(scenario.expected_edge_types),
                 "hop_count_target": 2 + (index % 2),
-                "audit_status": "candidate_needs_human_review",
+                "expect_answer": True,
+                "audit_status": "curated_pending_human_signoff",
+                "audit_notes": (
+                    "Source labels were curated from the bundled corpus scenario. "
+                    "Needs a human maintainer to verify evidence spans before publication."
+                ),
             }
         )
     return rows
 
 
 def write_candidate_golden_set(path: Path, count: int = 100) -> None:
-    """Write the deterministic candidate golden set to disk."""
+    """Write the deterministic curated golden set to disk."""
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = generate_candidate_golden_set(count=count)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

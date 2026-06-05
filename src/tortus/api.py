@@ -1,7 +1,10 @@
 """FastAPI, GraphQL, and dashboard routes for Tortus."""
 
 from collections import defaultdict
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import cast
 
 import strawberry
 from fastapi import FastAPI
@@ -10,11 +13,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 from strawberry.fastapi import GraphQLRouter
+from strawberry.types import Info
 
-from .config import get_settings
+from .config import Settings, get_settings
 from .eval import EvalReport
 from .models import ConceptNode, SemanticEdge, TraversalPolicy
-from .pipeline import data_paths, load_engine, load_nodes
+from .pipeline import data_paths, load_engine
+from .traversal import QueryEngine
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
@@ -66,6 +71,10 @@ class BudgetType:
     shard_fanout: int
     shard_crossings: int
     tokens_estimated: int
+    candidates_considered: int
+    pruned_edges: int
+    portal_candidates: int
+    lexical_support: int
     truncated: bool
 
 
@@ -77,6 +86,10 @@ class HopType:
     to_node: str
     edge_type: str
     weight: float
+    score: float
+    reason: str
+    matched_terms: list[str]
+    torus_distance: float | None
 
 
 @strawberry.type
@@ -96,24 +109,24 @@ class Query:
     """Top-level Tortus GraphQL query fields."""
 
     @strawberry.field
-    def concept(self, id: str) -> ConceptType | None:
+    def concept(self, info: Info, id: str) -> ConceptType | None:
         """Return a concept node by id."""
-        engine = load_engine(get_settings())
+        engine = engine_from_info(info)
         node = engine.graph.get_node(id)
         if node is None:
             return None
         return to_concept_type(node)
 
     @strawberry.field
-    def concepts(self) -> list[ConceptType]:
+    def concepts(self, info: Info) -> list[ConceptType]:
         """Return all concept nodes in the current graph."""
-        return [to_concept_type(node) for node in load_nodes(get_settings())]
+        return [to_concept_type(node) for node in engine_from_info(info).graph.list_nodes()]
 
     @strawberry.field
-    def answer(self, query: str, policy: AnswerPolicyInput | None = None) -> AnswerType:
+    def answer(self, info: Info, query: str, policy: AnswerPolicyInput | None = None) -> AnswerType:
         """Answer a query with bounded graph traversal and evidence paths."""
         policy = policy or AnswerPolicyInput()
-        result = load_engine(get_settings()).answer(
+        result = engine_from_info(info).answer(
             query,
             TraversalPolicy(
                 max_hops=policy.max_hops,
@@ -135,6 +148,10 @@ class Query:
                     to_node=hop.to_node,
                     edge_type=hop.edge_type.value,
                     weight=hop.weight,
+                    score=hop.score,
+                    reason=hop.reason,
+                    matched_terms=hop.matched_terms,
+                    torus_distance=hop.torus_distance,
                 )
                 for hop in result.reasoning_path
             ],
@@ -226,9 +243,26 @@ def average(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
-def create_app() -> FastAPI:
+def engine_from_info(info: Info) -> QueryEngine:
+    """Return the cached engine from the FastAPI app state."""
+    request = info.context["request"]
+    return cast(QueryEngine, request.app.state.engine)
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
     """Create the Tortus FastAPI app with GraphQL and dashboard routes."""
-    fastapi_app = FastAPI(title="Tortus")
+    settings = settings or get_settings()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        app.state.settings = settings
+        app.state.engine = load_engine(settings)
+        try:
+            yield
+        finally:
+            app.state.engine.graph.close()
+
+    fastapi_app = FastAPI(title="Tortus", lifespan=lifespan)
     schema = strawberry.Schema(query=Query)
     fastapi_app.include_router(GraphQLRouter(schema), prefix="/graphql")
     fastapi_app.mount(
@@ -254,7 +288,7 @@ def create_app() -> FastAPI:
     @fastapi_app.get("/api/graph")
     async def graph_data() -> dict[str, list[dict[str, object]]]:
         """Return graph nodes and edges for the Plotly dashboard."""
-        engine = load_engine(get_settings())
+        engine: QueryEngine = fastapi_app.state.engine
         return {
             "nodes": [node_payload(node) for node in engine.graph.list_nodes()],
             "edges": [edge_payload(edge) for edge in engine.graph.list_edges()],

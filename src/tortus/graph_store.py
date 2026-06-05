@@ -9,20 +9,26 @@ from .models import ConceptNode, EdgeType, SemanticEdge
 
 
 class GraphStore:
-    """Represent GraphStore data."""
+    """SQLite-backed semantic graph store."""
 
     def __init__(self, path: Path) -> None:
         """Initialize a SQLite-backed graph store."""
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.connection = sqlite3.connect(self.path)
+        self.connection = sqlite3.connect(self.path, check_same_thread=False)
+        self.connection.execute("PRAGMA foreign_keys = ON")
         self.connection.row_factory = sqlite3.Row
+        self.closed = False
         self.create_schema()
 
     def create_schema(self) -> None:
-        """Create create schema."""
+        """Create or migrate the graph schema."""
         self.connection.executescript(
             """
+            CREATE TABLE IF NOT EXISTS graph_meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS nodes (
                 id TEXT PRIMARY KEY,
                 payload TEXT NOT NULL
@@ -37,12 +43,17 @@ class GraphStore:
             );
             CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source);
             CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target);
+            CREATE INDEX IF NOT EXISTS idx_edges_type ON edges(edge_type);
+            CREATE INDEX IF NOT EXISTS idx_edges_weight ON edges(weight);
             """
+        )
+        self.connection.execute(
+            "INSERT OR REPLACE INTO graph_meta(key, value) VALUES ('schema_version', '2')"
         )
         self.connection.commit()
 
     def upsert_nodes(self, nodes: list[ConceptNode]) -> None:
-        """Upsert upsert nodes."""
+        """Upsert concept nodes into the graph store."""
         self.connection.executemany(
             "INSERT OR REPLACE INTO nodes(id, payload) VALUES (?, ?)",
             [(node.id, node.model_dump_json()) for node in nodes],
@@ -50,7 +61,21 @@ class GraphStore:
         self.connection.commit()
 
     def upsert_edges(self, edges: list[SemanticEdge]) -> None:
-        """Upsert upsert edges."""
+        """Upsert edges after validating their endpoint nodes exist."""
+        known_nodes = {
+            str(row["id"])
+            for row in self.connection.execute("SELECT id FROM nodes").fetchall()
+        }
+        missing = sorted(
+            {
+                node_id
+                for edge in edges
+                for node_id in (edge.source, edge.target)
+                if node_id not in known_nodes
+            }
+        )
+        if missing:
+            raise ValueError(f"edge endpoint(s) missing from graph nodes: {', '.join(missing[:5])}")
         self.connection.executemany(
             """
             INSERT OR REPLACE INTO edges(id, source, target, edge_type, weight, payload)
@@ -71,7 +96,7 @@ class GraphStore:
         self.connection.commit()
 
     def get_node(self, node_id: str) -> ConceptNode | None:
-        """Return get node."""
+        """Return one concept node by id."""
         row = self.connection.execute(
             "SELECT payload FROM nodes WHERE id = ?",
             (node_id,),
@@ -79,17 +104,17 @@ class GraphStore:
         return ConceptNode.model_validate_json(row["payload"]) if row else None
 
     def list_nodes(self) -> list[ConceptNode]:
-        """Return list nodes."""
+        """Return all concept nodes sorted by id."""
         rows = self.connection.execute("SELECT payload FROM nodes ORDER BY id").fetchall()
         return [ConceptNode.model_validate_json(row["payload"]) for row in rows]
 
     def list_edges(self) -> list[SemanticEdge]:
-        """Return list edges."""
+        """Return all semantic edges sorted by id."""
         rows = self.connection.execute("SELECT payload FROM edges ORDER BY id").fetchall()
         return [SemanticEdge.model_validate_json(row["payload"]) for row in rows]
 
     def neighbors(self, node_id: str, local_only: bool = False) -> list[SemanticEdge]:
-        """Return neighbors."""
+        """Return incident edges for a node, optionally excluding portal hops."""
         rows = self.connection.execute(
             "SELECT payload FROM edges WHERE source = ? OR target = ?",
             (node_id, node_id),
@@ -100,7 +125,7 @@ class GraphStore:
         return edges
 
     def adjacency(self) -> dict[str, list[SemanticEdge]]:
-        """Return adjacency."""
+        """Return an undirected adjacency map for traversal utilities."""
         grouped: dict[str, list[SemanticEdge]] = defaultdict(list)
         for edge in self.list_edges():
             grouped[edge.source].append(edge)
@@ -110,7 +135,7 @@ class GraphStore:
         return dict(grouped)
 
     def stats(self) -> dict[str, int]:
-        """Return stats."""
+        """Return aggregate graph statistics."""
         node_count = self.connection.execute("SELECT COUNT(*) AS c FROM nodes").fetchone()["c"]
         edge_count = self.connection.execute("SELECT COUNT(*) AS c FROM edges").fetchone()["c"]
         portal_count = self.connection.execute(
@@ -120,10 +145,18 @@ class GraphStore:
             "nodes": int(node_count),
             "edges": int(edge_count),
             "portal_edges": int(portal_count),
+            "schema_version": int(self.schema_version()),
         }
 
+    def schema_version(self) -> str:
+        """Return the current graph schema version."""
+        row = self.connection.execute(
+            "SELECT value FROM graph_meta WHERE key = 'schema_version'"
+        ).fetchone()
+        return str(row["value"]) if row else "0"
+
     def export_json(self, path: Path) -> None:
-        """Return export json."""
+        """Export the graph store to a JSON snapshot."""
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "nodes": [node.model_dump(mode="json") for node in self.list_nodes()],
@@ -133,5 +166,7 @@ class GraphStore:
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     def close(self) -> None:
-        """Close close."""
-        self.connection.close()
+        """Close the underlying SQLite connection once."""
+        if not self.closed:
+            self.connection.close()
+            self.closed = True

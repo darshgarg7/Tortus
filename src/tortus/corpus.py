@@ -1,4 +1,4 @@
-"""Built-in engineering corpus and chunking helpers."""
+"""Built-in engineering/public corpora and chunking helpers."""
 
 from pathlib import Path
 
@@ -143,9 +143,195 @@ ENGINEERING_CORPUS: tuple[Document, ...] = (
     ),
 )
 
+PUBLIC_ENGINEERING_CORPUS: tuple[Document, ...] = (
+    Document(
+        id="doc:public-kubernetes-service-accounts",
+        title="Kubernetes service account token projection",
+        source="public://kubernetes/docs/service-accounts-admin@tortus-v1",
+        domain="kubernetes-auth",
+        metadata={
+            "url": "https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/",
+            "snapshot": "tortus-public-corpus-v1-2026-06-05",
+            "content_note": "Author-written summary of public Kubernetes documentation.",
+        },
+        text=(
+            "Kubernetes service account token projection uses the TokenRequest API so pods "
+            "receive bounded credentials instead of long-lived secret tokens. Operators must "
+            "validate audiences, expiration, and object binding when migrating workloads. "
+            "A failed migration often surfaces as authentication rejects at an API server or "
+            "gateway boundary, so rollout plans need metrics and compatibility checks."
+        ),
+    ),
+    Document(
+        id="doc:public-kubernetes-projected-volumes",
+        title="Kubernetes projected volumes and pod identity",
+        source="public://kubernetes/docs/projected-volumes@tortus-v1",
+        domain="kubernetes-auth",
+        metadata={
+            "url": "https://kubernetes.io/docs/concepts/storage/projected-volumes/",
+            "snapshot": "tortus-public-corpus-v1-2026-06-05",
+            "content_note": "Author-written summary of public Kubernetes documentation.",
+        },
+        text=(
+            "Projected volumes can combine multiple sources into a pod volume, including a "
+            "service account token with a configured audience and expiration. This lets the "
+            "kubelet request credentials that fit a workload boundary. When the audience is "
+            "wrong, downstream authentication middleware can reject the request even though "
+            "the pod still has a token file."
+        ),
+    ),
+    Document(
+        id="doc:public-kubernetes-sidecars",
+        title="Kubernetes sidecar container lifecycle",
+        source="public://kubernetes/docs/sidecar-containers@tortus-v1",
+        domain="kubernetes-workloads",
+        metadata={
+            "url": "https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/",
+            "snapshot": "tortus-public-corpus-v1-2026-06-05",
+            "content_note": "Author-written summary of public Kubernetes documentation.",
+        },
+        text=(
+            "Sidecar containers use lifecycle behavior that can keep a pod running after the "
+            "main application container exits. Debugging this requires events, termination "
+            "ordering, and observability data. Sidecar drain behavior can distract from token "
+            "audience or trace propagation incidents because both can appear during rollouts."
+        ),
+    ),
+    Document(
+        id="doc:public-opentelemetry-context",
+        title="OpenTelemetry context propagation",
+        source="public://opentelemetry/spec/context@tortus-v1",
+        domain="observability",
+        metadata={
+            "url": "https://opentelemetry.io/docs/specs/otel/context/",
+            "snapshot": "tortus-public-corpus-v1-2026-06-05",
+            "content_note": "Author-written summary of public OpenTelemetry documentation.",
+        },
+        text=(
+            "OpenTelemetry context propagation carries execution-scoped identifiers across "
+            "API boundaries so spans, baggage, metrics, and logs can be correlated. Services "
+            "usually propagate trace context through headers such as traceparent and baggage. "
+            "If retry middleware drops those carriers, a distributed trace can fragment at "
+            "the exact boundary where an incident responder needs continuity."
+        ),
+    ),
+    Document(
+        id="doc:public-opentelemetry-baggage",
+        title="OpenTelemetry baggage propagation",
+        source="public://opentelemetry/docs/baggage@tortus-v1",
+        domain="observability",
+        metadata={
+            "url": "https://opentelemetry.io/docs/concepts/signals/baggage/",
+            "snapshot": "tortus-public-corpus-v1-2026-06-05",
+            "content_note": "Author-written summary of public OpenTelemetry documentation.",
+        },
+        text=(
+            "Baggage is contextual key-value data that travels with OpenTelemetry context. "
+            "It can help correlate a request across services, but it can also leak sensitive "
+            "or high-cardinality data when copied blindly. Gateways and retry handlers should "
+            "preserve required context carriers while applying clear propagation policy."
+        ),
+    ),
+    Document(
+        id="doc:public-w3c-trace-context",
+        title="W3C Trace Context",
+        source="public://w3c/trace-context@tortus-v1",
+        domain="observability",
+        metadata={
+            "url": "https://www.w3.org/TR/trace-context/",
+            "snapshot": "tortus-public-corpus-v1-2026-06-05",
+            "content_note": "Author-written summary of the public W3C recommendation.",
+        },
+        text=(
+            "W3C Trace Context standardizes traceparent and tracestate headers so tracing "
+            "systems can follow requests across process and service boundaries. A gateway "
+            "that retries a request without copying traceparent breaks parent-child span "
+            "relationships. That makes authentication failures harder to connect to later "
+            "downstream errors."
+        ),
+    ),
+    Document(
+        id="doc:public-rfc9110-retries",
+        title="RFC 9110 HTTP retries and idempotency",
+        source="public://ietf/rfc9110@tortus-v1",
+        domain="http-reliability",
+        metadata={
+            "url": "https://www.rfc-editor.org/rfc/rfc9110",
+            "snapshot": "tortus-public-corpus-v1-2026-06-05",
+            "content_note": "Author-written summary of public IETF HTTP semantics.",
+        },
+        text=(
+            "HTTP semantics distinguish safe and idempotent methods, which matters when "
+            "clients or gateways retry requests after network failures. Retry behavior should "
+            "avoid duplicating side effects and should preserve request metadata needed for "
+            "authentication and observability. Reliability policy therefore connects retry "
+            "logic with token validation and trace propagation."
+        ),
+    ),
+    Document(
+        id="doc:public-rfc7807-problem-details",
+        title="Problem details for HTTP APIs",
+        source="public://ietf/rfc7807@tortus-v1",
+        domain="http-reliability",
+        metadata={
+            "url": "https://www.rfc-editor.org/rfc/rfc7807",
+            "snapshot": "tortus-public-corpus-v1-2026-06-05",
+            "content_note": "Author-written summary of public IETF problem details.",
+        },
+        text=(
+            "Problem details give HTTP APIs a consistent structure for machine-readable "
+            "errors. Authentication middleware can use structured errors to expose rejected "
+            "audiences or invalid token state without hiding the cause. When paired with "
+            "trace identifiers, structured problem responses help incident responders join "
+            "API errors to distributed traces."
+        ),
+    ),
+    Document(
+        id="doc:public-sre-retry-observability",
+        title="Public SRE retry observability pattern",
+        source="public://sre/retry-observability@tortus-v1",
+        domain="incident-analysis",
+        metadata={
+            "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+            "snapshot": "tortus-public-corpus-v1-2026-06-05",
+            "content_note": "Author-written summary of public SRE reliability guidance.",
+        },
+        text=(
+            "Reliable systems treat retries as observable behavior rather than invisible "
+            "control flow. Dashboards should show retry rates, authentication rejects, and "
+            "trace continuity together when a rollout changes request identity. Without that "
+            "combined view, teams can mistake symptoms such as latency or sampling changes "
+            "for the root cause."
+        ),
+    ),
+    Document(
+        id="doc:public-cel-policy-rollout",
+        title="Policy rollout and compatibility checks",
+        source="public://architecture/policy-rollout@tortus-v1",
+        domain="platform-policy",
+        metadata={
+            "url": "https://github.com/kubernetes/enhancements",
+            "snapshot": "tortus-public-corpus-v1-2026-06-05",
+            "content_note": "Author-written architecture note based on public rollout patterns.",
+        },
+        text=(
+            "Policy rollouts should stage validation changes behind metrics, dry-run checks, "
+            "and compatibility gates. For service identity, the rollout question is not only "
+            "whether new tokens are valid, but whether every consumer expects the same "
+            "audience, lifetime, and propagation behavior across gateways."
+        ),
+    ),
+)
+
 
 def load_builtin_corpus(name: str = "engineering") -> list[Document]:
-    """Load load builtin corpus."""
+    """Load a built-in corpus by name."""
+    if name == "engineering":
+        return list(ENGINEERING_CORPUS)
+    if name == "public":
+        return list(PUBLIC_ENGINEERING_CORPUS)
+    if name in {"public-engineering", "engineering-public", "all"}:
+        return list(ENGINEERING_CORPUS + PUBLIC_ENGINEERING_CORPUS)
     if name != "engineering":
         raise ValueError(f"unknown built-in corpus: {name}")
     return list(ENGINEERING_CORPUS)
@@ -179,6 +365,7 @@ def chunk_document(document: Document, max_chars: int = 360) -> list[Chunk]:
                         text=chunk_text,
                     ),
                     ordinal=ordinal,
+                    metadata=document.metadata,
                 )
             )
             ordinal += 1
@@ -196,7 +383,7 @@ def chunk_corpus(documents: list[Document], max_chars: int = 360) -> list[Chunk]
 
 
 def write_snapshot(documents: list[Document], chunks: list[Chunk], out_dir: Path) -> None:
-    """Write write snapshot."""
+    """Write source documents and chunks to a reproducible local snapshot."""
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "documents.json").write_text(
         "[" + ",".join(document.model_dump_json() for document in documents) + "]\n",
