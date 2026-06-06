@@ -40,6 +40,7 @@ For advanced ingestion (PDF, HTML, URL extraction), install the optional depende
 pip install "tortus-rag[ingest]"
 ```
 
+
 ## Quickstart
 
 ### CLI Usage
@@ -51,7 +52,7 @@ Tortus is designed to run locally against your own documentation.
 tortus init
 
 # 2. Ingest your documents, Markdown files, or URLs
-tortus ingest README.md ./docs https://example.com/api-docs
+tortus ingest README.md ./docs https://example.com
 
 # 3. Build the graph and vector index
 tortus index
