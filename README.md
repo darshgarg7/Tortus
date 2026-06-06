@@ -51,7 +51,7 @@ Tortus is designed to run locally against your own documentation.
 tortus init
 
 # 2. Ingest your documents, Markdown files, or URLs
-tortus ingest README.md ./docs https://example.com/api-docs
+tortus ingest README.md ./docs https://example.com
 
 # 3. Build the graph and vector index
 tortus index
@@ -144,7 +144,7 @@ Tortus can now run against a local workspace instead of only built-in fixtures:
 ```bash
 tortus init
 tortus ingest ./docs
-tortus ingest README.md ./docs https://example.com/post
+tortus ingest README.md ./docs https://example.com
 tortus ingest --manifest sources.toml
 tortus index
 tortus query "Which docs explain the rollout risk?"
