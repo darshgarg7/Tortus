@@ -27,19 +27,63 @@ Current evidence strength is prototype-level. The benchmark numbers below are us
 | Baselines | Local vector, BM25, hybrid, graph-local, layout, community-summary, and bounded-agentic approximations. | Good sanity checks; not a final comparison to external systems. | Add serious GraphRAG/RAPTOR/HippoRAG/LightRAG-style implementations or clearly scoped reproductions. |
 | Scale | 118 V2 benchmark questions over a 25-node local graph. | Shows mechanics and failure modes; not enough statistical power. | Expand to audited multi-corpus evals with confidence intervals and failure taxonomy by query type. |
 
-## Quickstart
+## Installation
+
+Tortus is available on PyPI. Install it using `pip`:
 
 ```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev,ingest]'
+pip install tortus-rag
+```
 
-.venv/bin/tortus doctor
-.venv/bin/tortus init
-.venv/bin/tortus ingest README.md docs/
-.venv/bin/tortus index
-.venv/bin/tortus query "What does Tortus say about evidence-backed retrieval?" --explain
-.venv/bin/tortus serve --port 8010
+For advanced ingestion (PDF, HTML, URL extraction), install the optional dependencies:
+```bash
+pip install "tortus-rag[ingest]"
+```
+
+## Quickstart
+
+### CLI Usage
+
+Tortus is designed to run locally against your own documentation.
+
+```bash
+# 1. Initialize a local Tortus project
+tortus init
+
+# 2. Ingest your documents, Markdown files, or URLs
+tortus ingest README.md ./docs https://example.com/api-docs
+
+# 3. Build the graph and vector index
+tortus index
+
+# 4. Ask a question and trace the reasoning path
+tortus query "What does Tortus say about evidence-backed retrieval?" --explain
+
+# 5. Open the visual graph and query dashboard
+tortus serve --port 8010
 # Dashboard running at http://localhost:8010
+```
+
+### Python API Usage
+
+You can also use Tortus directly in your Python code as a library:
+
+```python
+import tortus
+from tortus.pipeline import Pipeline
+
+# Initialize the pipeline
+pipeline = Pipeline()
+
+# Query the graph
+result = pipeline.query("How do service accounts connect to tracing?")
+
+# Print the synthesized answer
+print(result.answer)
+
+# Audit the multi-hop reasoning path
+for hop in result.reasoning_path:
+    print(f"{hop.from_node} --[{hop.edge_type}]--> {hop.to_node}")
 ```
 
 To run the built-in benchmark corpus:
