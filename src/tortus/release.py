@@ -41,7 +41,7 @@ def run_doctor(settings: Settings) -> list[DoctorCheck]:
     }.items():
         checks.append(DoctorCheck(label, path.exists(), str(path)))
 
-    for package in ("pypdf", "trafilatura", "bs4", "faiss", "graphrag"):
+    for package in ("pypdf", "trafilatura", "bs4", "faiss", "graphrag", "llama_index", "lightrag"):
         checks.append(
             DoctorCheck(
                 f"optional dependency {package}",

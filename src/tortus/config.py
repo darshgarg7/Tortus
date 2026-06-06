@@ -15,6 +15,7 @@ CONFIG_KEY_TO_FIELD = {
     "corpus": "tortus_corpus",
     "embedding_provider": "tortus_embedding_provider",
     "embedding_model": "tortus_embedding_model",
+    "embedding_dimensions": "tortus_embedding_dimensions",
     "vector_backend": "tortus_vector_backend",
     "data_dir": "tortus_data_dir",
     "cache_dir": "tortus_cache_dir",
@@ -41,6 +42,8 @@ class Settings(BaseSettings):
     azure_openai_embedding_deployment: str | None = Field(
         default=None, alias="AZURE_OPENAI_EMBEDDING_DEPLOYMENT"
     )
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    openai_base_url: str | None = Field(default=None, alias="OPENAI_BASE_URL")
 
     tortus_llm_model: str = Field(default="gpt-4.1", alias="TORTUS_LLM_MODEL")
     tortus_corpus: str = Field(default="public-engineering", alias="TORTUS_CORPUS")
@@ -48,6 +51,10 @@ class Settings(BaseSettings):
     tortus_embedding_model: str = Field(
         default="text-embedding-3-large",
         alias="TORTUS_EMBEDDING_MODEL",
+    )
+    tortus_embedding_dimensions: int | None = Field(
+        default=None,
+        alias="TORTUS_EMBEDDING_DIMENSIONS",
     )
     tortus_vector_backend: str = Field(default="exact", alias="TORTUS_VECTOR_BACKEND")
     tortus_data_dir: Path = Field(default=Path("data"), alias="TORTUS_DATA_DIR")
@@ -74,6 +81,8 @@ def settings_with_overrides(
     data_dir: Path | None = None,
     cache_dir: Path | None = None,
     vector_backend: str | None = None,
+    embedding_provider: str | None = None,
+    embedding_model: str | None = None,
 ) -> Settings:
     """Return settings updated with explicit CLI-level overrides."""
     updates: dict[str, Any] = {}
@@ -85,6 +94,10 @@ def settings_with_overrides(
         updates["tortus_cache_dir"] = cache_dir
     if vector_backend is not None:
         updates["tortus_vector_backend"] = vector_backend
+    if embedding_provider is not None:
+        updates["tortus_embedding_provider"] = embedding_provider
+    if embedding_model is not None:
+        updates["tortus_embedding_model"] = embedding_model
     return settings.model_copy(update=updates)
 
 
@@ -141,6 +154,7 @@ def default_project_config() -> str:
             'data_dir = ".tortus/data"',
             'cache_dir = ".tortus/cache"',
             'embedding_provider = "local"',
+            'embedding_model = "text-embedding-3-large"',
             'vector_backend = "exact"',
             "",
         ]

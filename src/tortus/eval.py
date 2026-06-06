@@ -327,11 +327,14 @@ def run_eval(
     engine: QueryEngine,
     suite: str = "smoke",
     strategies: tuple[str, ...] = STRATEGIES,
+    audit_file: Path | None = None,
 ) -> EvalReport:
     """Run a suite across selected retrieval strategies."""
     rows: list[EvalRow] = []
     policy = TraversalPolicy(max_hops=3, max_nodes=32)
     questions = questions_for_suite(suite)
+    if audit_file is not None:
+        questions = apply_audit_file(questions, audit_file)
     for question in questions:
         for strategy in strategies:
             started = time.perf_counter()
@@ -404,6 +407,62 @@ def run_smoke_eval(
 ) -> EvalReport:
     """Run the smoke suite across selected strategies."""
     return run_eval(engine, suite="smoke", strategies=strategies)
+
+
+def apply_audit_file(questions: tuple[EvalQuestion, ...], path: Path) -> tuple[EvalQuestion, ...]:
+    """Apply imported human-audit labels to eval questions."""
+    if not path.exists():
+        raise FileNotFoundError(f"audit file does not exist: {path}")
+    from .audit import AuditRecord
+
+    records: dict[str, AuditRecord] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            parsed_record = AuditRecord.model_validate_json(line)
+            records[parsed_record.id] = parsed_record
+    audited: list[EvalQuestion] = []
+    for question in questions:
+        record = records.get(question.id)
+        if record is None:
+            audited.append(question)
+            continue
+        status = normalized_audit_status(record)
+        use_reviewed_labels = status.startswith("human_reviewed")
+        audited.append(
+            EvalQuestion(
+                id=question.id,
+                suite=question.suite,
+                question=record.question if use_reviewed_labels else question.question,
+                expected_terms=tuple(record.expected_terms)
+                if use_reviewed_labels
+                else question.expected_terms,
+                expected_sources=tuple(record.expected_sources)
+                if use_reviewed_labels
+                else question.expected_sources,
+                expected_edge_types=tuple(record.expected_edge_types)
+                if use_reviewed_labels
+                else question.expected_edge_types,
+                expect_answer=record.expect_answer
+                if use_reviewed_labels
+                else question.expect_answer,
+                audit_status=status,
+            )
+        )
+    return tuple(audited)
+
+
+def normalized_audit_status(record: object) -> str:
+    """Return a report-safe status label for an audit record."""
+    status = str(getattr(record, "status", "pending")).strip().lower()
+    auditor = str(getattr(record, "auditor", "")).strip()
+    reviewed_at = str(getattr(record, "reviewed_at", "")).strip()
+    if status in {"approved", "human_reviewed", "reviewed"} and auditor and reviewed_at:
+        return "human_reviewed"
+    if status in {"approved", "human_reviewed", "reviewed"}:
+        return "reviewed_missing_metadata"
+    if status in {"rejected", "invalid"}:
+        return "human_rejected"
+    return f"audit_{status or 'pending'}"
 
 
 def questions_for_suite(suite: str) -> tuple[EvalQuestion, ...]:

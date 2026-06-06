@@ -65,7 +65,9 @@ faiss = [
   "faiss-cpu>=1.9.0"
 ]
 baselines = [
-  "graphrag>=2.0.0"
+  "graphrag>=2.0.0",
+  "llama-index>=0.12.0",
+  "lightrag-hku>=1.0.0"
 ]
 release = [
   "build>=1.2.2",

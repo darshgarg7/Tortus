@@ -16,6 +16,7 @@ def test_parse_strategies_all_and_subset() -> None:
     assert parse_strategies("bm25,vector_only") == ("bm25_local", "vector_only_local")
     assert {
         "hybrid_dense_bm25_local",
+        "hybrid_graph_rerank_local",
         "community_summary_local",
         "bounded_agentic_local",
     }.issubset(set(STRATEGIES))

@@ -93,6 +93,11 @@ def ingest(
 def index(
     layout: str = typer.Option("torus", help="Layout to build: torus."),
     corpus: str | None = typer.Option(None, help="Corpus name to index."),
+    embedding_provider: str | None = typer.Option(
+        None,
+        help="Override embedding provider: local, openai, or azure.",
+    ),
+    embedding_model: str | None = typer.Option(None, help="Override embedding model name."),
     data_dir: Annotated[
         Path | None,
         typer.Option(help="Override TORTUS_DATA_DIR for this command."),
@@ -101,7 +106,13 @@ def index(
     """Build index."""
     if layout != "torus":
         raise typer.BadParameter("only the torus layout is implemented in this release")
-    settings = settings_with_overrides(get_settings(), corpus=corpus, data_dir=data_dir)
+    settings = settings_with_overrides(
+        get_settings(),
+        corpus=corpus,
+        data_dir=data_dir,
+        embedding_provider=embedding_provider,
+        embedding_model=embedding_model,
+    )
     stats = build_index(settings, corpus=settings.tortus_corpus)
     console.print("Built Tortus index")
     console.print_json(json.dumps(stats))
@@ -114,13 +125,24 @@ def query(
     max_hops: int = typer.Option(3, help="Traversal hop budget."),
     local_only: bool = typer.Option(False, help="Disable portal hops."),
     corpus: str | None = typer.Option(None, help="Corpus name to query."),
+    embedding_provider: str | None = typer.Option(
+        None,
+        help="Override embedding provider: local, openai, or azure.",
+    ),
+    embedding_model: str | None = typer.Option(None, help="Override embedding model name."),
     data_dir: Annotated[
         Path | None,
         typer.Option(help="Override TORTUS_DATA_DIR for this command."),
     ] = None,
 ) -> None:
     """Run a query against the local Tortus engine."""
-    settings = settings_with_overrides(get_settings(), corpus=corpus, data_dir=data_dir)
+    settings = settings_with_overrides(
+        get_settings(),
+        corpus=corpus,
+        data_dir=data_dir,
+        embedding_provider=embedding_provider,
+        embedding_model=embedding_model,
+    )
     engine = load_engine(settings)
     result = engine.answer(
         text,
@@ -150,7 +172,7 @@ def eval_command(
     suite: str = typer.Option("smoke", help="Eval suite: smoke."),
     strategies: str = typer.Option(
         "all",
-        help="Comma-separated strategies or all.",
+        help="Comma-separated strategies, all, external, or all_with_external.",
     ),
     json_out: Annotated[
         Path | None,
@@ -159,6 +181,10 @@ def eval_command(
     duckdb_out: Annotated[
         Path | None,
         typer.Option(help="Optional DuckDB path for eval rows."),
+    ] = None,
+    audit_file: Annotated[
+        Path | None,
+        typer.Option(help="Optional imported human-audit JSONL file to apply to labels."),
     ] = None,
 ) -> None:
     """Run an evaluation suite."""
@@ -170,7 +196,12 @@ def eval_command(
         selected_strategies = parse_strategies(strategies)
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
-    report = run_eval(load_engine(get_settings()), suite=suite, strategies=selected_strategies)
+    report = run_eval(
+        load_engine(get_settings()),
+        suite=suite,
+        strategies=selected_strategies,
+        audit_file=audit_file,
+    )
     table = Table(
         "question",
         "suite",
@@ -292,11 +323,31 @@ def release_check() -> None:
 def corpus_fetch(
     fetch: bool = typer.Option(False, "--fetch", help="Fetch live public source snapshots."),
     refresh: bool = typer.Option(False, "--refresh", help="Refetch existing live snapshots."),
+    materialize: bool = typer.Option(
+        False,
+        "--materialize",
+        help="Write an indexable external corpus snapshot under TORTUS_DATA_DIR.",
+    ),
+    corpus_name: str = typer.Option(
+        "external-engineering",
+        "--corpus",
+        help="Corpus name to materialize when --materialize is set.",
+    ),
 ) -> None:
     """Verify or fetch the pinned public corpus manifest."""
-    result = fetch_or_verify_public_corpus(get_settings(), fetch=fetch, refresh=refresh)
+    result = fetch_or_verify_public_corpus(
+        get_settings(),
+        fetch=fetch,
+        refresh=refresh,
+        materialize=materialize,
+        corpus_name=corpus_name,
+    )
     console.print(f"sources={result.sources} fetched={result.fetched}")
     console.print(f"manifest={result.out_path}")
+    if result.corpus_path:
+        console.print(
+            f"corpus={result.corpus_path} documents={result.documents} chunks={result.chunks}"
+        )
     for warning in result.warnings[:8]:
         console.print(f"[yellow]warning:[/yellow] {warning}")
 

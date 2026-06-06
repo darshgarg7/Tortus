@@ -31,3 +31,40 @@ def test_graphrag_external_baseline_skips_cleanly(tmp_path) -> None:
     assert run.skipped
     assert run.strategy == "graphrag_external"
     assert run.warnings
+
+
+def test_hybrid_graph_rerank_baseline_runs(tmp_path) -> None:
+    settings = Settings(
+        TORTUS_DATA_DIR=tmp_path / "data",
+        TORTUS_CACHE_DIR=tmp_path / "cache",
+        TORTUS_CORPUS="engineering",
+    )
+    build_index(settings)
+    run = run_strategy(
+        load_engine(settings),
+        "How did token migration connect authentication and tracing?",
+        "hybrid_graph_rerank_local",
+        TraversalPolicy(),
+    )
+    assert run.strategy == "hybrid_graph_rerank_local"
+    assert run.evidence
+    assert run.nodes_visited > 0
+
+
+def test_lightrag_external_baseline_skips_without_command(tmp_path) -> None:
+    settings = Settings(
+        TORTUS_DATA_DIR=tmp_path / "data",
+        TORTUS_CACHE_DIR=tmp_path / "cache",
+        TORTUS_CORPUS="engineering",
+    )
+    build_index(settings)
+    run = run_strategy(
+        load_engine(settings),
+        "How did token migration connect authentication and tracing?",
+        "lightrag_external",
+        TraversalPolicy(),
+    )
+    assert run.external
+    assert run.skipped
+    assert run.strategy == "lightrag_external"
+    assert "TORTUS_LIGHTRAG_COMMAND" in " ".join(run.warnings)

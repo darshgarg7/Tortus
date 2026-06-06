@@ -194,7 +194,7 @@ def generate_markdown_report(report: EvalReport) -> str:
         "tortus ingest --corpus public-engineering",
         "tortus index --layout torus --corpus public-engineering",
         "tortus golden-set --out data/golden_set.json --count 100",
-        "tortus eval --suite benchmark --strategies all \\",
+        f"tortus eval --suite benchmark --strategies {reproduction_strategy_arg(report)} \\",
         "  --json-out data/eval/benchmark.json \\",
         "  --duckdb-out data/eval/results.duckdb",
         "tortus report --eval-json data/eval/benchmark.json --out data/reports/eval-report.md",
@@ -202,6 +202,11 @@ def generate_markdown_report(report: EvalReport) -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+def reproduction_strategy_arg(report: EvalReport) -> str:
+    """Return the strategy selector that matches the report rows."""
+    return "all_with_external" if any(row.external for row in report.rows) else "all"
 
 
 def classify_row(row: EvalRow) -> list[str]:

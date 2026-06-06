@@ -1,5 +1,6 @@
 """Baseline retrieval strategies for Tortus evaluation."""
 
+import json
 import math
 import os
 import shlex
@@ -31,6 +32,7 @@ LOCAL_STRATEGIES = (
     "vector_only_local",
     "bm25_local",
     "hybrid_dense_bm25_local",
+    "hybrid_graph_rerank_local",
     "graph_local",
     "community_summary_local",
     "bounded_agentic_local",
@@ -38,13 +40,14 @@ LOCAL_STRATEGIES = (
     "euclidean_layout_local",
     "random_layout_local",
 )
-EXTERNAL_STRATEGIES = ("graphrag_external",)
+EXTERNAL_STRATEGIES = ("graphrag_external", "llamaindex_external", "lightrag_external")
 STRATEGIES = LOCAL_STRATEGIES
 ALL_STRATEGIES = LOCAL_STRATEGIES + EXTERNAL_STRATEGIES
 STRATEGY_ALIASES = {
     "vector_only": "vector_only_local",
     "bm25": "bm25_local",
     "hybrid_dense_bm25": "hybrid_dense_bm25_local",
+    "hybrid_graph_rerank": "hybrid_graph_rerank_local",
     "community_summary": "community_summary_local",
     "bounded_agentic": "bounded_agentic_local",
     "torus_layout": "torus_layout_local",
@@ -91,6 +94,8 @@ def run_strategy(
         return run_bm25(engine.graph, query, top_k=top_k, strategy=strategy)
     if strategy == "hybrid_dense_bm25_local":
         return run_hybrid_dense_bm25(engine, query, top_k=top_k, strategy=strategy)
+    if strategy == "hybrid_graph_rerank_local":
+        return run_hybrid_graph_rerank(engine, query, top_k=top_k, strategy=strategy)
     if strategy == "graph_local":
         return run_tortus(
             engine,
@@ -108,8 +113,8 @@ def run_strategy(
         return run_layout_probe(engine, query, distance="euclidean", top_k=top_k, strategy=strategy)
     if strategy == "random_layout_local":
         return run_layout_probe(engine, query, distance="random", top_k=top_k, strategy=strategy)
-    if strategy == "graphrag_external":
-        return run_graphrag_external(query, policy=policy)
+    if strategy in EXTERNAL_STRATEGIES:
+        return run_external_command_baseline(strategy, query, policy=policy)
     raise ValueError(f"unknown strategy: {strategy}")
 
 
@@ -241,6 +246,108 @@ def run_hybrid_dense_bm25(
         hops_taken=0,
         shard_fanout=shard_fanout_for_hits(engine.graph, hits),
         tokens_estimated=estimate_tokens(query, evidence),
+    )
+
+
+def run_hybrid_graph_rerank(
+    engine: QueryEngine,
+    query: str,
+    top_k: int = 5,
+    strategy: str = "hybrid_graph_rerank_local",
+) -> StrategyRun:
+    """Run a stronger hybrid baseline with one-hop graph expansion and reranking."""
+    started = time.perf_counter()
+    nodes = engine.graph.list_nodes()
+    nodes_by_id = {node.id: node for node in nodes}
+    query_terms = tokenize(query)
+    query_vector = engine.embeddings.embed([query])[0]
+    dense_hits = attach_evidence(
+        engine.graph,
+        engine.index.search(query_vector, top_k=min(12, len(nodes))),
+    )
+    bm25_ranked = score_bm25(nodes, query_terms)
+    dense_scores = normalize_scores({hit.node_id: hit.score for hit in dense_hits})
+    bm25_scores = normalize_scores({node.id: score for node, score in bm25_ranked})
+    seed_ids = list(
+        dict.fromkeys(
+            [hit.node_id for hit in dense_hits[:8]]
+            + [node.id for node, score in bm25_ranked[:8] if score > 0]
+        )
+    )
+    candidate_scores: dict[str, float] = {}
+    hops: list[ReasoningHop] = []
+    for seed_id in seed_ids:
+        node = nodes_by_id.get(seed_id)
+        if node is None:
+            continue
+        candidate_scores[seed_id] = max(
+            candidate_scores.get(seed_id, 0.0),
+            rerank_node_score(node, query_terms, dense_scores, bm25_scores),
+        )
+        for edge in sorted(
+            engine.graph.neighbors(seed_id),
+            key=lambda item: lexical_edge_score(engine.graph, item, seed_id, query),
+            reverse=True,
+        )[:4]:
+            target_id = edge.target if edge.source == seed_id else edge.source
+            target = nodes_by_id.get(target_id)
+            if target is None:
+                continue
+            edge_bonus = 0.18 if edge.edge_type == EdgeType.PORTAL else 0.10
+            candidate_scores[target_id] = max(
+                candidate_scores.get(target_id, 0.0),
+                rerank_node_score(target, query_terms, dense_scores, bm25_scores)
+                + edge.weight * 0.10
+                + edge_bonus,
+            )
+            hops.append(
+                ReasoningHop.model_validate(
+                    {
+                        "from": seed_id,
+                        "to": target_id,
+                        "edge_type": edge.edge_type,
+                        "weight": edge.weight,
+                        "evidence": edge.evidence[:1],
+                    }
+                )
+            )
+    ranked_ids = sorted(
+        candidate_scores,
+        key=lambda node_id: candidate_scores[node_id],
+        reverse=True,
+    )
+    selected_nodes = [
+        nodes_by_id[node_id] for node_id in ranked_ids[:top_k] if node_id in nodes_by_id
+    ]
+    hits = [
+        SearchHit(
+            node_id=node.id,
+            label=node.label,
+            score=candidate_scores.get(node.id, 0.0),
+            evidence=node.evidence,
+        )
+        for node in selected_nodes
+    ]
+    selected_ids = {node.id for node in selected_nodes}
+    selected_hops = [
+        hop for hop in hops if hop.to_node in selected_ids or hop.from_node in selected_ids
+    ]
+    evidence = dedupe_evidence([span for hit in hits for span in hit.evidence])
+    shard_simulator = ToroidalShardSimulator()
+    return StrategyRun(
+        strategy=strategy,
+        hits=hits,
+        evidence=evidence,
+        answer=synthesize_evidence_answer(query, hits, evidence).answer,
+        latency_ms=(time.perf_counter() - started) * 1000,
+        nodes_visited=len(candidate_scores),
+        hops_taken=len(selected_hops),
+        portal_hops=sum(hop.edge_type == EdgeType.PORTAL for hop in selected_hops),
+        shard_fanout=shard_simulator.fanout_for_node_ids(list(candidate_scores), nodes),
+        shard_crossings=shard_simulator.crossing_count(selected_hops, nodes),
+        tokens_estimated=estimate_tokens(query, evidence),
+        path_edge_types=[hop.edge_type.value for hop in selected_hops],
+        warnings=[] if evidence else ["Hybrid graph rerank baseline found no evidence."],
     )
 
 
@@ -418,37 +525,37 @@ def run_layout_probe(
     )
 
 
-def run_graphrag_external(query: str, policy: TraversalPolicy) -> StrategyRun:
-    """Run an optional Microsoft GraphRAG external adapter when configured."""
+EXTERNAL_COMMANDS = {
+    "graphrag_external": ("microsoft-graphrag", "TORTUS_GRAPHRAG_COMMAND", "graphrag"),
+    "llamaindex_external": ("llamaindex", "TORTUS_LLAMA_INDEX_COMMAND", "llama_index"),
+    "lightrag_external": ("lightrag", "TORTUS_LIGHTRAG_COMMAND", "lightrag"),
+}
+
+
+def run_external_command_baseline(
+    strategy: str,
+    query: str,
+    policy: TraversalPolicy,
+) -> StrategyRun:
+    """Run an optional external baseline through a configured command template."""
     started = time.perf_counter()
+    adapter, env_var, module_name = EXTERNAL_COMMANDS[strategy]
     metadata_payload: dict[str, str] = {
-        "adapter": "microsoft-graphrag",
-        "config": "TORTUS_GRAPHRAG_COMMAND",
+        "adapter": adapter,
+        "config": env_var,
     }
-    if util.find_spec("graphrag") is None:
-        return StrategyRun(
-            strategy="graphrag_external",
-            answer="",
-            latency_ms=(time.perf_counter() - started) * 1000,
-            nodes_visited=0,
-            hops_taken=0,
-            shard_fanout=0,
-            tokens_estimated=estimate_tokens(query, []),
-            warnings=["GraphRAG external baseline skipped: graphrag package is not installed."],
-            external=True,
-            skipped=True,
-            metadata=metadata_payload,
-        )
+    if util.find_spec(module_name) is not None:
+        try:
+            metadata_payload["dependency_version"] = metadata.version(module_name)
+        except metadata.PackageNotFoundError:
+            metadata_payload["dependency_version"] = "unknown"
+    else:
+        metadata_payload["dependency_version"] = "not_installed"
 
-    try:
-        metadata_payload["dependency_version"] = metadata.version("graphrag")
-    except metadata.PackageNotFoundError:
-        metadata_payload["dependency_version"] = "unknown"
-
-    command_template = os.environ.get("TORTUS_GRAPHRAG_COMMAND", "")
+    command_template = os.environ.get(env_var, "")
     if not command_template:
         return StrategyRun(
-            strategy="graphrag_external",
+            strategy=strategy,
             answer="",
             latency_ms=(time.perf_counter() - started) * 1000,
             nodes_visited=0,
@@ -456,7 +563,7 @@ def run_graphrag_external(query: str, policy: TraversalPolicy) -> StrategyRun:
             shard_fanout=0,
             tokens_estimated=estimate_tokens(query, []),
             warnings=[
-                "GraphRAG external baseline skipped: set TORTUS_GRAPHRAG_COMMAND "
+                f"{adapter} external baseline skipped: set {env_var} "
                 "to a command template containing {query}."
             ],
             external=True,
@@ -475,32 +582,52 @@ def run_graphrag_external(query: str, policy: TraversalPolicy) -> StrategyRun:
     )
     if completed.returncode != 0:
         return StrategyRun(
-            strategy="graphrag_external",
+            strategy=strategy,
             answer="",
             latency_ms=(time.perf_counter() - started) * 1000,
             nodes_visited=0,
             hops_taken=0,
             shard_fanout=0,
             tokens_estimated=estimate_tokens(query, []),
-            warnings=[f"GraphRAG external baseline failed: {completed.stderr.strip()}"],
+            warnings=[f"{adapter} external baseline failed: {completed.stderr.strip()}"],
             external=True,
             skipped=True,
             metadata=metadata_payload,
         )
-    answer = completed.stdout.strip()
+    answer, evidence = parse_external_stdout(completed.stdout)
     return StrategyRun(
-        strategy="graphrag_external",
+        strategy=strategy,
         answer=answer,
+        evidence=evidence,
         latency_ms=(time.perf_counter() - started) * 1000,
         nodes_visited=0,
         hops_taken=0,
         shard_fanout=0,
-        tokens_estimated=estimate_tokens(query, []),
+        tokens_estimated=estimate_tokens(query, evidence),
         warnings=[],
         external=True,
         skipped=False,
         metadata=metadata_payload,
     )
+
+
+def parse_external_stdout(stdout: str) -> tuple[str, list[EvidenceSpan]]:
+    """Parse optional JSON output from an external baseline command."""
+    text = stdout.strip()
+    if not text:
+        return "", []
+    try:
+        payload = json.loads(text)
+    except Exception:
+        return text, []
+    if not isinstance(payload, dict):
+        return text, []
+    evidence = [
+        EvidenceSpan.model_validate(span)
+        for span in payload.get("evidence", [])
+        if isinstance(span, dict)
+    ]
+    return str(payload.get("answer", text)), evidence
 
 
 def rank_by_layout(
@@ -598,6 +725,26 @@ def normalize_scores(scores: dict[str, float]) -> dict[str, float]:
     if maximum == minimum:
         return {key: 1.0 for key in scores}
     return {key: (value - minimum) / (maximum - minimum) for key, value in scores.items()}
+
+
+def rerank_node_score(
+    node: ConceptNode,
+    query_terms: list[str],
+    dense_scores: dict[str, float],
+    bm25_scores: dict[str, float],
+) -> float:
+    """Score one hybrid-rerank candidate using dense, sparse, and evidence support."""
+    query_set = set(query_terms)
+    node_terms = set(tokenize(node.label + " " + node.text))
+    evidence_terms = set(tokenize(" ".join(span.text for span in node.evidence)))
+    lexical = len(query_set.intersection(node_terms)) / max(1, len(query_set))
+    evidence_support = len(query_set.intersection(evidence_terms)) / max(1, len(query_set))
+    return (
+        0.36 * dense_scores.get(node.id, 0.0)
+        + 0.34 * bm25_scores.get(node.id, 0.0)
+        + 0.20 * lexical
+        + 0.10 * evidence_support
+    )
 
 
 def group_nodes_by_domain(nodes: list[ConceptNode]) -> dict[str, list[ConceptNode]]:
