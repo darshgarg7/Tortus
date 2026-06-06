@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - MVP-V1
+      - MVP-V2
 
 jobs:
   checks:
@@ -32,3 +32,21 @@ jobs:
 
       - name: Pytest
         run: python scripts/run_pytest.py
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Check distributions
+        run: twine check dist/*
+
+      - name: Wheel install smoke
+        run: |
+          python -m venv /tmp/tortus-wheel-smoke
+          /tmp/tortus-wheel-smoke/bin/python -m pip install --upgrade pip
+          /tmp/tortus-wheel-smoke/bin/python -m pip install dist/tortus_rag-*.whl
+          /tmp/tortus-wheel-smoke/bin/python -c "import tortus; print(tortus.__version__)"
+          TORTUS_DATA_DIR=/tmp/tortus-data TORTUS_CACHE_DIR=/tmp/tortus-cache /tmp/tortus-wheel-smoke/bin/tortus --help
+          TORTUS_DATA_DIR=/tmp/tortus-data TORTUS_CACHE_DIR=/tmp/tortus-cache /tmp/tortus-wheel-smoke/bin/tortus ingest --corpus engineering
+          TORTUS_DATA_DIR=/tmp/tortus-data TORTUS_CACHE_DIR=/tmp/tortus-cache /tmp/tortus-wheel-smoke/bin/tortus index --corpus engineering
+          TORTUS_DATA_DIR=/tmp/tortus-data TORTUS_CACHE_DIR=/tmp/tortus-cache /tmp/tortus-wheel-smoke/bin/tortus query "How did token migration connect authentication and tracing?"
+          TORTUS_DATA_DIR=/tmp/tortus-data TORTUS_CACHE_DIR=/tmp/tortus-cache /tmp/tortus-wheel-smoke/bin/tortus serve --dry-run

@@ -1,5 +1,6 @@
 """Persistence helpers for JSON and DuckDB eval reports."""
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -49,6 +50,10 @@ def write_eval_duckdb(report: EvalReport, path: Path) -> str:
                 tokens_estimated INTEGER NOT NULL,
                 path_edge_types TEXT NOT NULL DEFAULT '',
                 expect_answer BOOLEAN NOT NULL DEFAULT TRUE,
+                audit_status TEXT NOT NULL DEFAULT 'built_in',
+                external BOOLEAN NOT NULL DEFAULT FALSE,
+                skipped BOOLEAN NOT NULL DEFAULT FALSE,
+                strategy_metadata TEXT NOT NULL DEFAULT '{}',
                 warnings TEXT NOT NULL
             )
             """
@@ -67,6 +72,18 @@ def write_eval_duckdb(report: EvalReport, path: Path) -> str:
         )
         connection.execute(
             "ALTER TABLE eval_rows ADD COLUMN IF NOT EXISTS expect_answer BOOLEAN DEFAULT TRUE"
+        )
+        connection.execute(
+            "ALTER TABLE eval_rows ADD COLUMN IF NOT EXISTS audit_status TEXT DEFAULT 'built_in'"
+        )
+        connection.execute(
+            "ALTER TABLE eval_rows ADD COLUMN IF NOT EXISTS external BOOLEAN DEFAULT FALSE"
+        )
+        connection.execute(
+            "ALTER TABLE eval_rows ADD COLUMN IF NOT EXISTS skipped BOOLEAN DEFAULT FALSE"
+        )
+        connection.execute(
+            "ALTER TABLE eval_rows ADD COLUMN IF NOT EXISTS strategy_metadata TEXT DEFAULT '{}'"
         )
         connection.execute(
             "ALTER TABLE eval_rows ADD COLUMN IF NOT EXISTS portal_hops INTEGER DEFAULT 0"
@@ -99,10 +116,14 @@ def write_eval_duckdb(report: EvalReport, path: Path) -> str:
                 tokens_estimated,
                 path_edge_types,
                 expect_answer,
+                audit_status,
+                external,
+                skipped,
+                strategy_metadata,
                 warnings
             )
             VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
             """,
             [
@@ -125,6 +146,10 @@ def write_eval_duckdb(report: EvalReport, path: Path) -> str:
                     row.tokens_estimated,
                     ",".join(row.path_edge_types),
                     row.expect_answer,
+                    row.audit_status,
+                    row.external,
+                    row.skipped,
+                    json.dumps(row.strategy_metadata, sort_keys=True),
                     "; ".join(row.warnings),
                 ]
                 for row in report.rows

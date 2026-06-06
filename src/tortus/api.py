@@ -11,13 +11,14 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from starlette.requests import Request
 from strawberry.fastapi import GraphQLRouter
 from strawberry.types import Info
 
 from .config import Settings, get_settings
 from .eval import EvalReport
-from .models import ConceptNode, SemanticEdge, TraversalPolicy
+from .models import ConceptNode, ReasoningHop, RetrievalTrace, SemanticEdge, TraversalPolicy
 from .pipeline import data_paths, load_engine
 from .traversal import QueryEngine
 
@@ -33,6 +34,14 @@ class EvidenceType:
     start: int
     end: int
     text: str
+
+
+@strawberry.type
+class ScoreComponentType:
+    """GraphQL key/value score component."""
+
+    key: str
+    value: float
 
 
 @strawberry.type
@@ -54,7 +63,7 @@ class AnswerPolicyInput:
 
     max_hops: int = 3
     max_nodes: int = 64
-    max_portal_hops: int = 8
+    max_portal_hops: int = 5
     max_ms: int = 1500
     local_only: bool = False
     explain_hops: bool = True
@@ -90,6 +99,69 @@ class HopType:
     reason: str
     matched_terms: list[str]
     torus_distance: float | None
+    score_components: list[ScoreComponentType]
+
+
+@strawberry.type
+class SearchHitType:
+    """GraphQL representation of a seed search hit."""
+
+    node_id: str
+    label: str
+    score: float
+    matched_terms: list[str]
+    score_components: list[ScoreComponentType]
+
+
+@strawberry.type
+class PrunedCandidateType:
+    """GraphQL representation of a rejected traversal candidate."""
+
+    from_node: str
+    to_node: str
+    edge_type: str
+    score: float
+    reason: str
+    matched_terms: list[str]
+    torus_distance: float | None
+    score_components: list[ScoreComponentType]
+
+
+@strawberry.type
+class PortalDecisionType:
+    """GraphQL representation of a selected or rejected portal decision."""
+
+    from_node: str
+    to_node: str
+    selected: bool
+    score: float
+    reason: str
+    matched_terms: list[str]
+    score_components: list[ScoreComponentType]
+
+
+@strawberry.type
+class AnswerClaimType:
+    """GraphQL representation of a sentence-level answer claim."""
+
+    text: str
+    supported: bool
+    support_count: int
+    evidence_uris: list[str]
+
+
+@strawberry.type
+class RetrievalTraceType:
+    """GraphQL representation of typed retrieval diagnostics."""
+
+    query_terms: list[str]
+    seed_hits: list[SearchHitType]
+    selected_hops: list[HopType]
+    pruned_candidates: list[PrunedCandidateType]
+    portal_decisions: list[PortalDecisionType]
+    evidence_spans: list[EvidenceType]
+    answer_claims: list[AnswerClaimType]
+    unsupported_claims: list[AnswerClaimType]
 
 
 @strawberry.type
@@ -102,6 +174,14 @@ class AnswerType:
     warnings: list[str]
     reasoning_path: list[HopType]
     evidence: list[EvidenceType]
+    trace: RetrievalTraceType
+
+
+class QueryRequest(BaseModel):
+    """JSON request for the dashboard query endpoint."""
+
+    query: str
+    policy: dict[str, object] | None = None
 
 
 @strawberry.type
@@ -143,19 +223,11 @@ class Query:
             budget=BudgetType(**result.budget.model_dump()),
             warnings=result.warnings,
             reasoning_path=[
-                HopType(
-                    from_node=hop.from_node,
-                    to_node=hop.to_node,
-                    edge_type=hop.edge_type.value,
-                    weight=hop.weight,
-                    score=hop.score,
-                    reason=hop.reason,
-                    matched_terms=hop.matched_terms,
-                    torus_distance=hop.torus_distance,
-                )
+                to_hop_type(hop)
                 for hop in result.reasoning_path
             ],
             evidence=[EvidenceType(**span.model_dump()) for span in result.evidence],
+            trace=to_trace_type(result.trace),
         )
 
 
@@ -195,6 +267,91 @@ def edge_payload(edge: SemanticEdge) -> dict[str, object]:
         "edgeType": edge.edge_type.value,
         "weight": edge.weight,
     }
+
+
+def score_components_payload(components: dict[str, float]) -> list[ScoreComponentType]:
+    """Convert score component dicts to GraphQL key/value rows."""
+    return [
+        ScoreComponentType(key=key, value=value)
+        for key, value in sorted(components.items())
+    ]
+
+
+def to_hop_type(hop: ReasoningHop) -> HopType:
+    """Convert an internal reasoning hop to GraphQL DTO."""
+    return HopType(
+        from_node=hop.from_node,
+        to_node=hop.to_node,
+        edge_type=hop.edge_type.value,
+        weight=hop.weight,
+        score=hop.score,
+        reason=hop.reason,
+        matched_terms=hop.matched_terms,
+        torus_distance=hop.torus_distance,
+        score_components=score_components_payload(hop.score_components),
+    )
+
+
+def to_trace_type(trace: RetrievalTrace) -> RetrievalTraceType:
+    """Convert internal typed diagnostics to GraphQL DTOs."""
+    return RetrievalTraceType(
+        query_terms=trace.query_terms,
+        seed_hits=[
+            SearchHitType(
+                node_id=hit.node_id,
+                label=hit.label,
+                score=hit.score,
+                matched_terms=hit.matched_terms,
+                score_components=score_components_payload(hit.score_components),
+            )
+            for hit in trace.seed_hits
+        ],
+        selected_hops=[to_hop_type(hop) for hop in trace.selected_hops],
+        pruned_candidates=[
+            PrunedCandidateType(
+                from_node=candidate.from_node,
+                to_node=candidate.to_node,
+                edge_type=candidate.edge_type.value,
+                score=candidate.score,
+                reason=candidate.reason,
+                matched_terms=candidate.matched_terms,
+                torus_distance=candidate.torus_distance,
+                score_components=score_components_payload(candidate.score_components),
+            )
+            for candidate in trace.pruned_candidates
+        ],
+        portal_decisions=[
+            PortalDecisionType(
+                from_node=decision.from_node,
+                to_node=decision.to_node,
+                selected=decision.selected,
+                score=decision.score,
+                reason=decision.reason,
+                matched_terms=decision.matched_terms,
+                score_components=score_components_payload(decision.score_components),
+            )
+            for decision in trace.portal_decisions
+        ],
+        evidence_spans=[EvidenceType(**span.model_dump()) for span in trace.evidence_spans],
+        answer_claims=[
+            AnswerClaimType(
+                text=claim.text,
+                supported=claim.supported,
+                support_count=claim.support_count,
+                evidence_uris=claim.evidence_uris,
+            )
+            for claim in trace.answer_claims
+        ],
+        unsupported_claims=[
+            AnswerClaimType(
+                text=claim.text,
+                supported=claim.supported,
+                support_count=claim.support_count,
+                evidence_uris=claim.evidence_uris,
+            )
+            for claim in trace.unsupported_claims
+        ],
+    )
 
 
 def eval_summary_payload() -> list[dict[str, object]]:
@@ -241,6 +398,16 @@ def eval_summary_payload() -> list[dict[str, object]]:
 def average(values: list[float]) -> float:
     """Return the arithmetic mean for a list of floats."""
     return sum(values) / len(values) if values else 0.0
+
+
+def int_policy_value(policy: dict[str, object], key: str, default: int) -> int:
+    """Read an integer policy field from untyped JSON payload data."""
+    value = policy.get(key, default)
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int | float | str):
+        return int(value)
+    return default
 
 
 def engine_from_info(info: Info) -> QueryEngine:
@@ -298,5 +465,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def eval_summary() -> dict[str, list[dict[str, object]]]:
         """Return the latest strategy comparison summary."""
         return {"strategies": eval_summary_payload()}
+
+    @fastapi_app.post("/api/query")
+    async def query_data(payload: QueryRequest) -> dict[str, object]:
+        """Return an answer plus typed diagnostics for the dashboard."""
+        policy_payload = payload.policy or {}
+        policy = TraversalPolicy(
+            max_hops=int_policy_value(policy_payload, "max_hops", 3),
+            max_nodes=int_policy_value(policy_payload, "max_nodes", 64),
+            max_portal_hops=int_policy_value(policy_payload, "max_portal_hops", 5),
+            max_ms=int_policy_value(policy_payload, "max_ms", 1500),
+            local_only=bool(policy_payload.get("local_only", False)),
+            explain_hops=True,
+        )
+        engine: QueryEngine = fastapi_app.state.engine
+        result = engine.answer(payload.query, policy=policy)
+        return cast(dict[str, object], result.model_dump(mode="json"))
 
     return fastapi_app

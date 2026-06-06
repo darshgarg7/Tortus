@@ -17,6 +17,8 @@ def test_dashboard_assets_include_diagnostic_fields(tmp_path) -> None:
     assert "Score" in html
     assert "Terms" in html
     assert "Reason" in html
+    assert "Rejected candidates" in html
+    assert "Unsupported claims" in html
     assert script.status_code == 200
-    assert "matchedTerms" in script.text
-    assert "prunedEdges" in script.text
+    assert "matched_terms" in script.text
+    assert "pruned_candidates" in script.text

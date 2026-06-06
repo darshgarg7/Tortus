@@ -13,7 +13,10 @@ class StrategySummary(BaseModel):
     """Aggregate metrics for one retrieval strategy."""
 
     strategy: str
+    rows: int
     pass_rate: float
+    pass_ci_low: float
+    pass_ci_high: float
     term_recall: float
     source_recall: float
     path_recall: float
@@ -26,6 +29,8 @@ class StrategySummary(BaseModel):
     mean_shard_fanout: float
     mean_shard_crossings: float
     warning_rate: float
+    skipped_rate: float
+    external_rate: float
 
 
 def strategy_summaries(report: EvalReport) -> list[StrategySummary]:
@@ -37,10 +42,16 @@ def strategy_summaries(report: EvalReport) -> list[StrategySummary]:
     summaries: list[StrategySummary] = []
     for strategy in sorted(grouped):
         rows = grouped[strategy]
+        pass_values = [1.0 if row.passed else 0.0 for row in rows]
+        pass_rate = average(pass_values)
+        ci_low, ci_high = proportion_interval(pass_rate, len(rows))
         summaries.append(
             StrategySummary(
                 strategy=strategy,
-                pass_rate=average([1.0 if row.passed else 0.0 for row in rows]),
+                rows=len(rows),
+                pass_rate=pass_rate,
+                pass_ci_low=ci_low,
+                pass_ci_high=ci_high,
                 term_recall=average([row.term_recall for row in rows]),
                 source_recall=average([row.source_recall for row in rows]),
                 path_recall=average([row.path_recall for row in rows]),
@@ -53,6 +64,8 @@ def strategy_summaries(report: EvalReport) -> list[StrategySummary]:
                 mean_shard_fanout=average([float(row.shard_fanout) for row in rows]),
                 mean_shard_crossings=average([float(row.shard_crossings) for row in rows]),
                 warning_rate=average([1.0 if row.warnings else 0.0 for row in rows]),
+                skipped_rate=average([1.0 if row.skipped else 0.0 for row in rows]),
+                external_rate=average([1.0 if row.external else 0.0 for row in rows]),
             )
         )
     return summaries
@@ -93,7 +106,8 @@ def generate_markdown_report(report: EvalReport) -> str:
             "A pass requires term recall >= 0.50, source recall >= 0.50, "
             "path recall >= 0.50, and faithfulness >= 0.50 for answerable questions. "
             "Negative questions pass only when unsupported answers are withheld. "
-            "This is a local v1 benchmark, not a production superiority claim."
+            "Skipped external adapters are reported separately and are not counted as wins. "
+            "This is a local v2 benchmark, not a production superiority claim."
         ),
         "",
         "## Strategy Summary",
@@ -101,7 +115,9 @@ def generate_markdown_report(report: EvalReport) -> str:
         markdown_table(
             [
                 "strategy",
+                "rows",
                 "pass",
+                "95% CI",
                 "term",
                 "source",
                 "path",
@@ -114,11 +130,14 @@ def generate_markdown_report(report: EvalReport) -> str:
                 "fanout",
                 "cross",
                 "warn",
+                "skipped",
             ],
             [
                 [
                     summary.strategy,
+                    str(summary.rows),
                     f"{summary.pass_rate:.2f}",
+                    f"{summary.pass_ci_low:.2f}-{summary.pass_ci_high:.2f}",
                     f"{summary.term_recall:.2f}",
                     f"{summary.source_recall:.2f}",
                     f"{summary.path_recall:.2f}",
@@ -131,6 +150,7 @@ def generate_markdown_report(report: EvalReport) -> str:
                     f"{summary.mean_shard_fanout:.1f}",
                     f"{summary.mean_shard_crossings:.1f}",
                     f"{summary.warning_rate:.2f}",
+                    f"{summary.skipped_rate:.2f}",
                 ]
                 for summary in summaries
             ],
@@ -143,6 +163,14 @@ def generate_markdown_report(report: EvalReport) -> str:
         "## Suite Breakdown",
         "",
         suite_breakdown_summary(report),
+        "",
+        "## Audit Status",
+        "",
+        audit_status_summary(report),
+        "",
+        "## External Baselines",
+        "",
+        external_baseline_summary(report),
         "",
         "## Boundary-Crossing Slice",
         "",
@@ -163,8 +191,8 @@ def generate_markdown_report(report: EvalReport) -> str:
         "## Reproduction",
         "",
         "```bash",
-        "tortus ingest --corpus engineering",
-        "tortus index --layout torus",
+        "tortus ingest --corpus public-engineering",
+        "tortus index --layout torus --corpus public-engineering",
         "tortus golden-set --out data/golden_set.json --count 100",
         "tortus eval --suite benchmark --strategies all \\",
         "  --json-out data/eval/benchmark.json \\",
@@ -202,7 +230,11 @@ def classify_row(row: EvalRow) -> list[str]:
 def thesis_check(summaries: list[StrategySummary]) -> str:
     """Compare Tortus against the strongest current baseline."""
     tortus = next((summary for summary in summaries if summary.strategy == "tortus_torus"), None)
-    baselines = [summary for summary in summaries if summary.strategy != "tortus_torus"]
+    baselines = [
+        summary
+        for summary in summaries
+        if summary.strategy != "tortus_torus" and summary.skipped_rate < 1.0
+    ]
     if tortus is None:
         return "No `tortus_torus` row was present, so the thesis cannot be evaluated."
     if not baselines:
@@ -223,11 +255,11 @@ def thesis_check(summaries: list[StrategySummary]) -> str:
     faith_delta = tortus.faithfulness - best.faithfulness
 
     if pass_delta > 0:
-        verdict = "v1 supports keeping the toroidal traversal hypothesis alive"
+        verdict = "v2 supports keeping the toroidal traversal hypothesis alive"
     elif pass_delta == 0:
-        verdict = "v1 is inconclusive on pass rate"
+        verdict = "v2 is inconclusive on pass rate"
     else:
-        verdict = "v1 is a negative result for the current toroidal traversal policy"
+        verdict = "v2 is a negative result for the current toroidal traversal policy"
 
     return (
         f"{verdict}: `tortus_torus` is {pass_delta:+.2f} pass-rate points, "
@@ -302,6 +334,29 @@ def taxonomy_summary(taxonomy: Counter[str]) -> str:
     )
 
 
+def audit_status_summary(report: EvalReport) -> str:
+    """Summarize human audit labels represented in the report."""
+    counts = Counter(row.audit_status for row in report.rows)
+    return markdown_table(
+        ["audit status", "rows"],
+        [[status, str(count)] for status, count in counts.most_common()],
+    )
+
+
+def external_baseline_summary(report: EvalReport) -> str:
+    """Summarize external baseline availability and skip reasons."""
+    external_rows = [row for row in report.rows if row.external]
+    if not external_rows:
+        return "No external baseline rows were requested."
+    skipped = sum(row.skipped for row in external_rows)
+    warnings = Counter("; ".join(row.warnings) for row in external_rows if row.warnings)
+    warning_text = taxonomy_summary(warnings) if warnings else "No external baseline warnings."
+    return (
+        f"External rows: `{len(external_rows)}`. Skipped rows: `{skipped}`.\n\n"
+        + warning_text
+    )
+
+
 def cost_and_fanout_notes(summaries: list[StrategySummary]) -> str:
     """Summarize cost and fanout notes."""
     if not summaries:
@@ -314,7 +369,9 @@ def cost_and_fanout_notes(summaries: list[StrategySummary]) -> str:
         f"({highest_fanout.mean_shard_fanout:.1f}). "
         f"Highest p95 latency: `{slowest.strategy}` ({slowest.p95_latency_ms:.1f} ms). "
         f"Highest warning rate: `{warning_heaviest.strategy}` "
-        f"({warning_heaviest.warning_rate:.2f})."
+        f"({warning_heaviest.warning_rate:.2f}). "
+        "The V2 selectivity target is path recall >= 0.90, path precision >= 0.60, "
+        "mean fanout <= 5.5, and mean portal hops <= 5.0."
     )
 
 
@@ -360,6 +417,14 @@ def clean_cell(value: str) -> str:
 def average(values: Sequence[float]) -> float:
     """Return average."""
     return sum(values) / len(values) if values else 0.0
+
+
+def proportion_interval(rate: float, count: int) -> tuple[float, float]:
+    """Return a compact normal-approximate 95% interval for a pass rate."""
+    if count <= 0:
+        return (0.0, 0.0)
+    margin = 1.96 * ((rate * (1.0 - rate) / count) ** 0.5)
+    return (max(0.0, rate - margin), min(1.0, rate + margin))
 
 
 def percentile(values: Sequence[float], quantile: float) -> float:

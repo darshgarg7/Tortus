@@ -10,13 +10,17 @@ import numpy as np
 from .embeddings import EmbeddingProvider
 from .graph_store import GraphStore
 from .models import (
+    AnswerClaim,
     AnswerResult,
     BaselineComparison,
     BudgetStats,
     ConceptNode,
     EdgeType,
     EvidenceSpan,
+    PortalDecision,
+    PrunedCandidate,
     ReasoningHop,
+    RetrievalTrace,
     SearchHit,
     SemanticEdge,
     TraversalPolicy,
@@ -36,6 +40,9 @@ OUT_OF_SCOPE_INTENT_TERMS = {
     "tomorrow",
     "weather",
 }
+FRONTIER_BEAM_WIDTH = 5
+MAX_SELECTED_EDGES_PER_NODE = 3
+MAX_PORTALS_PER_NODE = 1
 
 
 class SearchableIndex(Protocol):
@@ -67,6 +74,8 @@ class SynthesizedAnswer:
     evidence: list[EvidenceSpan]
     confidence: float
     lexical_support: int
+    claims: list[AnswerClaim]
+    unsupported_claims: list[AnswerClaim]
 
 
 class QueryEngine:
@@ -89,7 +98,7 @@ class QueryEngine:
         started = time.perf_counter()
         query_terms = token_set(query)
         query_vector = self.embeddings.embed([query])[0]
-        seed_hits = self.index.search(query_vector, top_k=min(8, policy.max_nodes))
+        seed_hits = self.index.search(query_vector, top_k=min(5, policy.max_nodes))
         nodes_by_id = {node.id: node for node in self.graph.list_nodes()}
         seed_hits = attach_hit_diagnostics(seed_hits, nodes_by_id, query_terms)
         seed_anchor = next(
@@ -116,6 +125,8 @@ class QueryEngine:
         candidates_considered = 0
         pruned_edges = 0
         selected_portals_by_node: dict[str, int] = {}
+        pruned_candidates: list[PrunedCandidate] = []
+        portal_decisions: list[PortalDecision] = []
 
         while frontier and len(visited) < policy.max_nodes:
             if (time.perf_counter() - started) * 1000 > policy.max_ms:
@@ -161,6 +172,7 @@ class QueryEngine:
                 )
                 for edge in neighbor_edges
             ]
+            selected_edges_for_node = 0
             for edge, edge_score in sorted(
                 scored_edges,
                 key=lambda item: item[1].score,
@@ -168,25 +180,52 @@ class QueryEngine:
             ):
                 candidates_considered += 1
                 target = edge_score.target
-                if target in visited or edge_score.pruned:
-                    pruned_edges += 1
-                    continue
                 if edge.edge_type == EdgeType.PORTAL:
                     portal_candidates += 1
-                    if portal_hops >= policy.max_portal_hops:
-                        pruned_edges += 1
-                        continue
-                    selected_for_node = selected_portals_by_node.get(node_id, 0)
-                    if selected_for_node >= 2 and edge_score.score < score + 0.22:
-                        pruned_edges += 1
-                        continue
-                    selected_portals_by_node[node_id] = selected_for_node + 1
+                prune_reason = prune_reason_for_candidate(
+                    target=target,
+                    visited=visited,
+                    edge=edge,
+                    edge_score=edge_score,
+                    current_score=score,
+                    selected_edges_for_node=selected_edges_for_node,
+                    portal_hops=portal_hops,
+                    portal_candidates_by_node=selected_portals_by_node.get(node_id, 0),
+                    policy=policy,
+                )
+                if prune_reason is not None:
+                    pruned_edges += 1
+                    record_pruned_candidate(
+                        pruned_candidates,
+                        edge=edge,
+                        edge_score=edge_score,
+                        from_node=node_id,
+                        reason=prune_reason,
+                    )
+                    if edge.edge_type == EdgeType.PORTAL:
+                        record_portal_decision(
+                            portal_decisions,
+                            edge_score=edge_score,
+                            from_node=node_id,
+                            selected=False,
+                            reason=prune_reason,
+                    )
+                    continue
+                if edge.edge_type == EdgeType.PORTAL:
+                    portal_hops += 1
+                    selected_portals_by_node[node_id] = selected_portals_by_node.get(node_id, 0) + 1
+                    record_portal_decision(
+                        portal_decisions,
+                        edge_score=edge_score,
+                        from_node=node_id,
+                        selected=True,
+                        reason=edge_score.reason,
+                    )
+                selected_edges_for_node += 1
                 frontier.append((target, edge_score.score, depth + 1, edge_score.components))
                 hop_key = (node_id, target, edge.edge_type)
                 if policy.explain_hops and hop_key not in seen_hops:
                     seen_hops.add(hop_key)
-                    if edge.edge_type == EdgeType.PORTAL:
-                        portal_hops += 1
                     hops.append(
                         ReasoningHop.model_validate(
                             {
@@ -204,9 +243,31 @@ class QueryEngine:
                         )
                     )
             frontier.sort(key=lambda item: item[1], reverse=True)
+            if len(frontier) > FRONTIER_BEAM_WIDTH:
+                for target, pruned_score, _, pruned_components in frontier[FRONTIER_BEAM_WIDTH:]:
+                    pruned_edges += 1
+                    pruned_candidates.append(
+                        PrunedCandidate(
+                            from_node=node_id,
+                            to_node=target,
+                            edge_type=EdgeType.RELATED_TO,
+                            score=pruned_score,
+                            reason="frontier_beam_pruned",
+                            score_components=pruned_components,
+                        )
+                    )
+                frontier = frontier[:FRONTIER_BEAM_WIDTH]
+            if evidence_has_sufficient_coverage(query_terms, evidence) and len(visited) >= 4:
+                break
 
         elapsed_ms = (time.perf_counter() - started) * 1000
         synthesized = synthesize_evidence_answer(query, best_hits[:8], evidence)
+        reported_hops = select_reasoning_hops(
+            hops,
+            query_terms=query_terms,
+            evidence=synthesized.evidence,
+            limit=min(policy.max_nodes, max(4, policy.max_hops * 2 + 2)),
+        )
         warnings: list[str] = []
         if not synthesized.evidence:
             warnings.append("No evidence was retrieved; answer is intentionally withheld.")
@@ -233,7 +294,18 @@ class QueryEngine:
             "portal_candidates": portal_candidates,
             "pruned_edges": pruned_edges,
             "query_terms": sorted(query_terms),
+            "raw_hops_considered": len(hops),
         }
+        trace = RetrievalTrace(
+            query_terms=sorted(query_terms),
+            seed_hits=seed_hits[:8],
+            selected_hops=reported_hops,
+            pruned_candidates=pruned_candidates[:80],
+            portal_decisions=portal_decisions[:80],
+            evidence_spans=synthesized.evidence[:10],
+            answer_claims=synthesized.claims,
+            unsupported_claims=synthesized.unsupported_claims,
+        )
         logger.info(
             "query_answered elapsed_ms=%.2f nodes=%s hops=%s portals=%s pruned=%s support=%s",
             elapsed_ms,
@@ -246,15 +318,15 @@ class QueryEngine:
         return AnswerResult(
             answer=synthesized.answer,
             confidence=synthesized.confidence,
-            reasoning_path=hops[: policy.max_nodes],
+            reasoning_path=reported_hops,
             evidence=synthesized.evidence[:10],
             budget=BudgetStats(
                 elapsed_ms=elapsed_ms,
                 nodes_visited=len(visited),
-                hops_taken=len(hops),
+                hops_taken=len(reported_hops),
                 portal_hops=portal_hops,
                 shard_fanout=shard_simulator.fanout_for_nodes(visited_nodes),
-                shard_crossings=shard_simulator.crossing_count(hops, all_nodes),
+                shard_crossings=shard_simulator.crossing_count(reported_hops, all_nodes),
                 tokens_estimated=estimate_tokens(query, synthesized.evidence),
                 candidates_considered=candidates_considered,
                 pruned_edges=pruned_edges,
@@ -264,6 +336,7 @@ class QueryEngine:
             ),
             warnings=warnings,
             baseline_comparison=[vector_baseline],
+            trace=trace,
             diagnostics=diagnostics,
         )
 
@@ -289,6 +362,148 @@ def attach_hit_diagnostics(
             )
         )
     return attached
+
+
+def prune_reason_for_candidate(
+    *,
+    target: str,
+    visited: set[str],
+    edge: SemanticEdge,
+    edge_score: EdgeScore,
+    current_score: float,
+    selected_edges_for_node: int,
+    portal_hops: int,
+    portal_candidates_by_node: int,
+    policy: TraversalPolicy,
+) -> str | None:
+    """Return a prune reason for a candidate edge, or None if it should be selected."""
+    if target in visited:
+        return "already_visited"
+    if edge_score.pruned:
+        return edge_score.reason
+    if selected_edges_for_node >= MAX_SELECTED_EDGES_PER_NODE:
+        return "per_node_beam_width"
+    if not edge_score.matched_terms and edge_score.score < current_score + 0.08:
+        return "low_score_without_query_support"
+    if edge.edge_type != EdgeType.PORTAL:
+        return None
+    if portal_hops >= policy.max_portal_hops:
+        return "portal_budget"
+    if portal_candidates_by_node >= MAX_PORTALS_PER_NODE:
+        return "portal_per_node_limit"
+    if not edge_score.matched_terms:
+        return "portal_without_query_support"
+    if edge_score.components.get("lexical", 0.0) < 0.20 and edge_score.score < current_score + 0.30:
+        return "portal_weak_evidence_gain"
+    return None
+
+
+def record_pruned_candidate(
+    candidates: list[PrunedCandidate],
+    *,
+    edge: SemanticEdge,
+    edge_score: EdgeScore,
+    from_node: str,
+    reason: str,
+) -> None:
+    """Append a bounded pruned candidate trace row."""
+    if len(candidates) >= 120:
+        return
+    candidates.append(
+        PrunedCandidate(
+            from_node=from_node,
+            to_node=edge_score.target,
+            edge_type=edge.edge_type,
+            score=edge_score.score,
+            reason=reason,
+            matched_terms=edge_score.matched_terms,
+            torus_distance=edge_score.torus_distance,
+            score_components=edge_score.components,
+        )
+    )
+
+
+def record_portal_decision(
+    decisions: list[PortalDecision],
+    *,
+    edge_score: EdgeScore,
+    from_node: str,
+    selected: bool,
+    reason: str,
+) -> None:
+    """Append a bounded portal decision trace row."""
+    if len(decisions) >= 120:
+        return
+    decisions.append(
+        PortalDecision(
+            from_node=from_node,
+            to_node=edge_score.target,
+            selected=selected,
+            score=edge_score.score,
+            reason=reason,
+            matched_terms=edge_score.matched_terms,
+            score_components=edge_score.components,
+        )
+    )
+
+
+def evidence_has_sufficient_coverage(query_terms: set[str], evidence: list[EvidenceSpan]) -> bool:
+    """Return whether selected evidence covers enough query terms to stop expansion."""
+    if not query_terms or len(evidence) < 4:
+        return False
+    evidence_terms = token_set(" ".join(span.text for span in evidence[-10:]))
+    coverage = len(query_terms.intersection(evidence_terms)) / len(query_terms)
+    return coverage >= 0.62
+
+
+def select_reasoning_hops(
+    hops: list[ReasoningHop],
+    *,
+    query_terms: set[str],
+    evidence: list[EvidenceSpan],
+    limit: int,
+) -> list[ReasoningHop]:
+    """Return a compact, high-support reasoning path from raw traversal expansions."""
+    if len(hops) <= limit:
+        return hops
+    evidence_terms = token_set(" ".join(span.text for span in evidence))
+    evidence_bonus_terms = query_terms.intersection(evidence_terms)
+
+    def hop_score(hop: ReasoningHop) -> float:
+        matched = set(hop.matched_terms)
+        lexical = len(matched.intersection(query_terms)) / max(1, len(query_terms))
+        evidence_bonus = 0.18 if matched.intersection(evidence_bonus_terms) else 0.0
+        portal_bonus = 0.22 if hop.edge_type == EdgeType.PORTAL else 0.0
+        support_bonus = 0.14 if hop.evidence else 0.0
+        distance_penalty = min(0.18, (hop.torus_distance or 0.0) / 20.0)
+        return (
+            hop.score
+            + lexical
+            + evidence_bonus
+            + portal_bonus
+            + support_bonus
+            - distance_penalty
+        )
+
+    ranked = sorted(hops, key=hop_score, reverse=True)
+    selected: list[ReasoningHop] = []
+    seen_nodes: set[str] = set()
+    for hop in ranked:
+        introduces_node = hop.from_node not in seen_nodes or hop.to_node not in seen_nodes
+        if introduces_node or hop.edge_type == EdgeType.PORTAL:
+            selected.append(hop)
+            seen_nodes.update({hop.from_node, hop.to_node})
+        if len(selected) >= limit:
+            break
+    if not any(hop.edge_type == EdgeType.PORTAL for hop in selected):
+        portal = next((hop for hop in ranked if hop.edge_type == EdgeType.PORTAL), None)
+        if portal is not None:
+            selected = [portal, *selected[: max(0, limit - 1)]]
+    if not any(hop.edge_type == EdgeType.RELATED_TO for hop in selected):
+        related = next((hop for hop in ranked if hop.edge_type == EdgeType.RELATED_TO), None)
+        if related is not None and related not in selected:
+            selected = [*selected[: max(0, limit - 1)], related]
+    return sorted(selected, key=lambda hop: hops.index(hop))
 
 
 def score_edge(
@@ -392,42 +607,70 @@ def synthesize_evidence_answer(
 ) -> SynthesizedAnswer:
     """Build a concise extractive answer using only supported evidence spans."""
     if token_set(query).intersection(OUT_OF_SCOPE_INTENT_TERMS):
+        unsupported = [
+            AnswerClaim(
+                text="I could not find enough source-backed evidence to answer this query.",
+                supported=False,
+            )
+        ]
         return SynthesizedAnswer(
             answer="I could not find enough source-backed evidence to answer this query.",
             evidence=[],
             confidence=0.0,
             lexical_support=0,
+            claims=unsupported,
+            unsupported_claims=unsupported,
         )
     supported = [item for item in rank_evidence(query, dedupe_evidence(evidence)) if item[0] > 0]
     if not supported:
+        unsupported = [
+            AnswerClaim(
+                text="I could not find enough source-backed evidence to answer this query.",
+                supported=False,
+            )
+        ]
         return SynthesizedAnswer(
             answer="I could not find enough source-backed evidence to answer this query.",
             evidence=[],
             confidence=0.0,
             lexical_support=0,
+            claims=unsupported,
+            unsupported_claims=unsupported,
         )
-    selected = [span for _, span in supported[:5]]
+    selected = [span for _, span in supported[:6]]
     sentences = select_supporting_sentences(query, selected)
     if not sentences:
+        unsupported = [
+            AnswerClaim(
+                text="I could not find enough source-backed evidence to answer this query.",
+                supported=False,
+            )
+        ]
         return SynthesizedAnswer(
             answer="I could not find enough source-backed evidence to answer this query.",
             evidence=[],
             confidence=0.0,
             lexical_support=0,
+            claims=unsupported,
+            unsupported_claims=unsupported,
         )
     labels = ", ".join(hit.label for hit in hits[:3])
     source_count = len({span.uri for span in selected})
     body = " ".join(sentences[:4])
-    lexical_support = sum(score for score, _ in supported[:5])
+    lexical_support = sum(score for score, _ in supported[:6])
     confidence = min(0.95, 0.32 + 0.10 * len(selected) + 0.04 * min(5, lexical_support))
+    answer = (
+        f"{body} The strongest retrieved concepts are {labels}. "
+        f"This answer is grounded in {source_count} source(s)."
+    )
+    claims = claims_for_answer(answer, selected, query)
     return SynthesizedAnswer(
-        answer=(
-            f"{body} The strongest retrieved concepts are {labels}. "
-            f"This answer is grounded in {source_count} source(s)."
-        ),
+        answer=answer,
         evidence=selected,
         confidence=confidence,
         lexical_support=lexical_support,
+        claims=claims,
+        unsupported_claims=[claim for claim in claims if not claim.supported],
     )
 
 
@@ -457,6 +700,30 @@ def select_supporting_sentences(query: str, evidence: list[EvidenceSpan]) -> lis
         if len(selected) >= 4:
             break
     return selected
+
+
+def claims_for_answer(answer: str, evidence: list[EvidenceSpan], query: str) -> list[AnswerClaim]:
+    """Score each answer sentence against selected evidence spans."""
+    query_terms = token_set(query)
+    claims: list[AnswerClaim] = []
+    for sentence in split_sentences(answer):
+        sentence_terms = token_set(sentence) - query_terms
+        supporting_spans = [
+            span
+            for span in evidence
+            if sentence_terms and len(sentence_terms.intersection(token_set(span.text))) >= 1
+        ]
+        if not sentence_terms and evidence:
+            supporting_spans = evidence[:1]
+        claims.append(
+            AnswerClaim(
+                text=sentence,
+                supported=bool(supporting_spans),
+                support_count=len(supporting_spans),
+                evidence_uris=sorted({span.uri for span in supporting_spans}),
+            )
+        )
+    return claims
 
 
 def dedupe_evidence(spans: list[EvidenceSpan]) -> list[EvidenceSpan]:

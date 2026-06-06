@@ -23,7 +23,11 @@ def test_ingest_index_query_eval_roundtrip(tmp_path) -> None:
     report = run_smoke_eval(engine)
     assert report.rows
     assert report.pass_rate("tortus_torus") > 0
-    assert {row.strategy for row in report.rows} >= {"tortus_torus", "vector_only", "bm25"}
+    assert {row.strategy for row in report.rows} >= {
+        "tortus_torus",
+        "vector_only_local",
+        "bm25_local",
+    }
 
     full_report = run_eval(engine, suite="full", strategies=("tortus_torus", "vector_only"))
     assert len(questions_for_suite("full")) > len(questions_for_suite("smoke"))

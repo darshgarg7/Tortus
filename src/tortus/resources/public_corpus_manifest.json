@@ -1,0 +1,67 @@
+{
+  "name": "public-engineering",
+  "snapshot": "tortus-public-corpus-v1-2026-06-05",
+  "description": "Pinned source manifest for Tortus public engineering corpus summaries.",
+  "sources": [
+    {
+      "id": "kubernetes-service-accounts-admin",
+      "title": "Kubernetes service account token projection",
+      "url": "https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/",
+      "license_note": "Public Kubernetes documentation; verify upstream license before redistributing full text."
+    },
+    {
+      "id": "kubernetes-projected-volumes",
+      "title": "Kubernetes projected volumes and pod identity",
+      "url": "https://kubernetes.io/docs/concepts/storage/projected-volumes/",
+      "license_note": "Public Kubernetes documentation; verify upstream license before redistributing full text."
+    },
+    {
+      "id": "kubernetes-sidecar-containers",
+      "title": "Kubernetes sidecar container lifecycle",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/",
+      "license_note": "Public Kubernetes documentation; verify upstream license before redistributing full text."
+    },
+    {
+      "id": "opentelemetry-context",
+      "title": "OpenTelemetry context propagation",
+      "url": "https://opentelemetry.io/docs/specs/otel/context/",
+      "license_note": "Public OpenTelemetry documentation; verify upstream license before redistributing full text."
+    },
+    {
+      "id": "opentelemetry-baggage",
+      "title": "OpenTelemetry baggage propagation",
+      "url": "https://opentelemetry.io/docs/concepts/signals/baggage/",
+      "license_note": "Public OpenTelemetry documentation; verify upstream license before redistributing full text."
+    },
+    {
+      "id": "w3c-trace-context",
+      "title": "W3C Trace Context",
+      "url": "https://www.w3.org/TR/trace-context/",
+      "license_note": "Public W3C recommendation; verify upstream license before redistributing full text."
+    },
+    {
+      "id": "rfc9110",
+      "title": "RFC 9110 HTTP semantics",
+      "url": "https://www.rfc-editor.org/rfc/rfc9110",
+      "license_note": "Public RFC text; verify IETF Trust license terms before redistributing full text."
+    },
+    {
+      "id": "rfc7807",
+      "title": "Problem details for HTTP APIs",
+      "url": "https://www.rfc-editor.org/rfc/rfc7807",
+      "license_note": "Public RFC text; verify IETF Trust license terms before redistributing full text."
+    },
+    {
+      "id": "sre-monitoring-distributed-systems",
+      "title": "Public SRE retry observability pattern",
+      "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+      "license_note": "Public SRE book page; verify upstream license before redistributing full text."
+    },
+    {
+      "id": "kubernetes-enhancements",
+      "title": "Policy rollout and compatibility checks",
+      "url": "https://github.com/kubernetes/enhancements",
+      "license_note": "Public GitHub repository; verify repository license before redistributing full text."
+    }
+  ]
+}

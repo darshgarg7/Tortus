@@ -1,22 +1,22 @@
 # Evidence Hardening Plan
 
-Tortus currently has a working v1 harness, not a publishable research result. This file tracks what must become real before the README metrics should be presented as evidence of broad retrieval quality.
+Tortus currently has a working V2 harness, installable package surface, workspace ingestion, typed diagnostics, and benchmark reports. It is still not a publishable research result. This file tracks what must become real before README metrics should be presented as evidence of broad retrieval quality.
 
 ## Current Limits
 
 | Area | Limit | Risk |
 | --- | --- | --- |
-| Corpus | Built-in engineering corpus plus source-backed public engineering summaries. | Results can still reflect fixture design until public snapshots are larger and independently reviewed. |
+| Corpus | Built-in engineering corpus plus source-backed public engineering summaries and a pinned public manifest workflow. | Results can still reflect fixture design until public snapshots are larger and independently reviewed. |
 | Extraction | Deterministic term and edge construction. | Avoids noisy extraction failures that a real graph builder must handle. |
 | Embeddings | Local hash fallback by default. | Does not measure semantic embedding quality, cost, or cache behavior. |
 | Labels | Curated candidate questions with expected sources and explicit pending-human-signoff status. | Ground truth can be circular unless a human maintainer audits evidence spans. |
-| Baselines | Local approximations of hybrid, GraphRAG-style, and agentic retrieval. | Comparisons can be directionally useful but not externally convincing. |
-| Scale | Tiny graph and 116-question benchmark. | No statistical confidence and limited failure diversity. |
+| Baselines | Local approximations plus an optional external GraphRAG adapter protocol that skips cleanly when unconfigured. | Comparisons can be directionally useful but not externally convincing until real external runs are configured and reported. |
+| Scale | Tiny graph and 118-question benchmark. | Confidence intervals are reported, but failure diversity is still limited. |
 
 ## Upgrade Gates
 
 1. **External corpus gate**
-   Add commit-pinned, permissively licensed engineering docs with snapshot manifests and source provenance. Initial targets: Kubernetes KEPs/docs, OpenTelemetry specs, and public architecture/RFC-style documents.
+   Expand from the packaged public manifest to larger commit-pinned, permissively licensed engineering docs with source provenance. Initial targets remain Kubernetes KEPs/docs, OpenTelemetry specs, and public architecture/RFC-style documents.
 
 2. **Embedding gate**
    Run the same index through cached API-backed embeddings. Report model name, dimensions, cache hit rate, total tokens, estimated cost, and latency.
@@ -28,10 +28,10 @@ Tortus currently has a working v1 harness, not a publishable research result. Th
    Manually audit at least 100 questions. Each row should have expected evidence URIs, expected path labels, negative/distractor notes, and an `audit_status` changed from `curated_pending_human_signoff` to a maintainer-reviewed status.
 
 5. **Baseline gate**
-   Replace or qualify local approximations with stronger baselines: vector-only, BM25+dense hybrid, graph-local traversal, community-summary GraphRAG-style retrieval, bounded agentic search, and layout ablations.
+   Run and report configured external baselines, starting with Microsoft GraphRAG. Keep local baselines clearly labeled as `_local` controls.
 
 6. **Statistical gate**
-   Report confidence intervals by suite: `single_hop`, `multi_hop`, `boundary_crossing`, and stress/failure slices. Include failure taxonomy, not just wins.
+   Keep confidence intervals by suite: `single_hop`, `multi_hop`, `boundary_crossing`, and stress/failure slices. Include failure taxonomy, not just wins, and separate audited from unaudited rows.
 
 ## Publishable Claim Bar
 
@@ -44,4 +44,4 @@ Tortus can make a credible public claim only after all of the following are true
 - baselines are either serious implementations or explicitly scoped approximations
 - the report includes wins, losses, fanout, latency, cost, and failure analysis
 
-Until then, the honest claim is narrower: Tortus is an executable architecture and evaluation harness for testing whether toroidal, budgeted graph traversal is worth scaling.
+Until then, the honest claim is narrower: Tortus is an installable architecture, diagnostic workbench, and evaluation harness for testing whether toroidal, budgeted graph traversal is worth scaling.

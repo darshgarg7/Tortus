@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from .baselines import STRATEGIES, run_strategy
+from .baselines import ALL_STRATEGIES, STRATEGIES, STRATEGY_ALIASES, run_strategy
 from .models import TraversalPolicy
 from .text import token_set
 from .traversal import QueryEngine
@@ -25,6 +25,7 @@ class EvalQuestion:
     expected_sources: tuple[str, ...]
     expected_edge_types: tuple[str, ...] = ()
     expect_answer: bool = True
+    audit_status: str = "built_in"
 
 
 SMOKE_QUESTIONS = (
@@ -284,10 +285,16 @@ class EvalRow(BaseModel):
     path_edge_types: list[str] = Field(default_factory=list)
     warnings: list[str]
     expect_answer: bool = True
+    audit_status: str = "built_in"
+    external: bool = False
+    skipped: bool = False
+    strategy_metadata: dict[str, str] = Field(default_factory=dict)
 
     @property
     def passed(self) -> bool:
-        """Return whether this row satisfies the v1 evaluation threshold."""
+        """Return whether this row satisfies the evaluation threshold."""
+        if self.skipped:
+            return False
         if not self.expect_answer:
             return self.faithfulness >= 1.0 and self.source_recall >= 1.0
         return (
@@ -382,6 +389,10 @@ def run_eval(
                     path_edge_types=run.path_edge_types,
                     warnings=run.warnings,
                     expect_answer=question.expect_answer,
+                    audit_status=question.audit_status,
+                    external=run.external,
+                    skipped=run.skipped,
+                    strategy_metadata=run.metadata,
                 )
             )
     return EvalReport(suite=suite, rows=rows)
@@ -434,6 +445,7 @@ def load_json_questions(path: Path) -> tuple[EvalQuestion, ...]:
             expected_sources=tuple(str(source) for source in row["expected_sources"]),
             expected_edge_types=tuple(str(edge) for edge in row.get("expected_edge_types", ())),
             expect_answer=bool(row.get("expect_answer", True)),
+            audit_status=str(row.get("audit_status", "curated_pending_human_signoff")),
         )
         for row in payload
     )
@@ -481,8 +493,13 @@ def parse_strategies(value: str) -> tuple[str, ...]:
     """Parse a comma-separated strategy selection."""
     if value == "all":
         return STRATEGIES
+    if value in {"external", "external_only"}:
+        return tuple(strategy for strategy in ALL_STRATEGIES if strategy.endswith("_external"))
+    if value in {"all_with_external", "all-external"}:
+        return ALL_STRATEGIES
     requested = tuple(item.strip() for item in value.split(",") if item.strip())
-    unknown = sorted(set(requested) - set(STRATEGIES))
+    canonical = tuple(STRATEGY_ALIASES.get(item, item) for item in requested)
+    unknown = sorted(set(canonical) - set(ALL_STRATEGIES))
     if unknown:
         raise ValueError(f"unknown eval strategies: {', '.join(unknown)}")
-    return requested
+    return canonical

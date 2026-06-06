@@ -46,6 +46,14 @@ def test_api_graphql_dashboard_and_summary(tmp_path) -> None:
                       score
                       reason
                       matchedTerms
+                      scoreComponents { key value }
+                    }
+                    trace {
+                      queryTerms
+                      seedHits { nodeId score matchedTerms }
+                      prunedCandidates { fromNode toNode edgeType reason score }
+                      portalDecisions { fromNode toNode selected reason }
+                      unsupportedClaims { text supported }
                     }
                     evidence { uri text }
                   }
@@ -62,4 +70,15 @@ def test_api_graphql_dashboard_and_summary(tmp_path) -> None:
         answer = payload["data"]["answer"]
         assert answer["confidence"] > 0
         assert answer["evidence"]
+        assert answer["trace"]["seedHits"]
+        assert "prunedCandidates" in answer["trace"]
         assert answer["budget"]["candidatesConsidered"] >= answer["budget"]["nodesVisited"] - 1
+
+        json_response = client.post(
+            "/api/query",
+            json={"query": "How did token migration connect authentication and tracing?"},
+        )
+        assert json_response.status_code == 200
+        json_payload = json_response.json()
+        assert json_payload["trace"]["seed_hits"]
+        assert "pruned_candidates" in json_payload["trace"]

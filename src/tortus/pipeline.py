@@ -7,7 +7,8 @@ from .corpus import chunk_corpus, load_builtin_corpus, write_snapshot
 from .embeddings import build_embedding_provider
 from .extract import extract_graph
 from .graph_store import GraphStore
-from .models import ConceptNode
+from .ingest import WorkspaceIngestResult, ingest_workspace, load_snapshot_documents
+from .models import ConceptNode, Document
 from .torus import assign_torus
 from .traversal import QueryEngine
 from .vector import build_vector_index, load_vector_index, vector_index_path
@@ -34,10 +35,21 @@ def ingest_builtin(settings: Settings, corpus: str | None = None) -> tuple[int, 
     return len(documents), len(chunks)
 
 
+def ingest_sources(
+    settings: Settings,
+    sources: list[str],
+    *,
+    manifest: Path | None = None,
+    refresh: bool = False,
+) -> WorkspaceIngestResult:
+    """Ingest user-provided sources into the workspace corpus."""
+    return ingest_workspace(settings, sources, manifest=manifest, refresh=refresh)
+
+
 def build_index(settings: Settings, corpus: str | None = None) -> dict[str, int]:
-    """Build the graph store and vector index for a built-in corpus."""
+    """Build the graph store and vector index for the selected corpus."""
     corpus = corpus or settings.tortus_corpus
-    documents = load_builtin_corpus(corpus)
+    documents = load_documents(settings, corpus)
     chunks = chunk_corpus(documents)
     nodes, edges = extract_graph(chunks)
     embeddings = build_embedding_provider(settings)
@@ -54,6 +66,14 @@ def build_index(settings: Settings, corpus: str | None = None) -> dict[str, int]
     stats = graph.stats()
     graph.close()
     return stats
+
+
+def load_documents(settings: Settings, corpus: str) -> list[Document]:
+    """Load documents from a built-in corpus or persisted workspace snapshot."""
+    snapshot_dir = data_paths(settings)["root"] / "corpus" / corpus
+    if corpus == "workspace" or (snapshot_dir / "documents.json").exists():
+        return load_snapshot_documents(snapshot_dir)
+    return load_builtin_corpus(corpus)
 
 
 def load_engine(settings: Settings) -> QueryEngine:

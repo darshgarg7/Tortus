@@ -1,16 +1,36 @@
 """Runtime configuration for Tortus."""
 
+import os
+import tomllib
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PROJECT_CONFIG_NAME = "tortus.toml"
+
+CONFIG_KEY_TO_FIELD = {
+    "corpus": "tortus_corpus",
+    "embedding_provider": "tortus_embedding_provider",
+    "embedding_model": "tortus_embedding_model",
+    "vector_backend": "tortus_vector_backend",
+    "data_dir": "tortus_data_dir",
+    "cache_dir": "tortus_cache_dir",
+    "llm_model": "tortus_llm_model",
+}
 
 
 class Settings(BaseSettings):
     """Runtime configuration loaded from environment variables and .env."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        populate_by_name=True,
+    )
 
     azure_openai_endpoint: str | None = Field(default=None, alias="AZURE_OPENAI_ENDPOINT")
     azure_openai_api_key: str | None = Field(default=None, alias="AZURE_OPENAI_API_KEY")
@@ -36,5 +56,92 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Return get settings."""
-    return Settings()
+    """Return runtime settings with env values overriding tortus.toml values."""
+    project_values = project_config_values(project_config_path())
+    env_aliases = configured_env_aliases()
+    filtered_values = {
+        key: value
+        for key, value in project_values.items()
+        if settings_alias_for_field(key) not in env_aliases
+    }
+    return Settings(**filtered_values)
+
+
+def settings_with_overrides(
+    settings: Settings,
+    *,
+    corpus: str | None = None,
+    data_dir: Path | None = None,
+    cache_dir: Path | None = None,
+    vector_backend: str | None = None,
+) -> Settings:
+    """Return settings updated with explicit CLI-level overrides."""
+    updates: dict[str, Any] = {}
+    if corpus is not None:
+        updates["tortus_corpus"] = corpus
+    if data_dir is not None:
+        updates["tortus_data_dir"] = data_dir
+    if cache_dir is not None:
+        updates["tortus_cache_dir"] = cache_dir
+    if vector_backend is not None:
+        updates["tortus_vector_backend"] = vector_backend
+    return settings.model_copy(update=updates)
+
+
+def project_config_path(start: Path | None = None) -> Path | None:
+    """Return the nearest tortus.toml path by walking upward from the current directory."""
+    current = (start or Path.cwd()).resolve()
+    for candidate in (current, *current.parents):
+        path = candidate / PROJECT_CONFIG_NAME
+        if path.exists():
+            return path
+    return None
+
+
+def project_config_values(path: Path | None) -> dict[str, Any]:
+    """Load recognized Tortus settings from a project config file."""
+    if path is None:
+        return {}
+    payload = tomllib.loads(path.read_text(encoding="utf-8"))
+    section = payload.get("tortus", payload)
+    if not isinstance(section, dict):
+        return {}
+    values: dict[str, Any] = {}
+    for key, value in section.items():
+        field_name = CONFIG_KEY_TO_FIELD.get(str(key), str(key))
+        if field_name in Settings.model_fields:
+            values[field_name] = value
+    return values
+
+
+def configured_env_aliases(dotenv_path: Path = Path(".env")) -> set[str]:
+    """Return environment aliases configured through OS env or the local .env file."""
+    aliases = {str(key) for key in os.environ}
+    if dotenv_path.exists():
+        for line in dotenv_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                continue
+            aliases.add(stripped.split("=", 1)[0].strip())
+    return aliases
+
+
+def settings_alias_for_field(field_name: str) -> str:
+    """Return the environment alias for a Settings field name."""
+    field = Settings.model_fields[field_name]
+    return str(field.alias or field_name)
+
+
+def default_project_config() -> str:
+    """Return the default tortus.toml content for a local project."""
+    return "\n".join(
+        [
+            "[tortus]",
+            'corpus = "workspace"',
+            'data_dir = ".tortus/data"',
+            'cache_dir = ".tortus/cache"',
+            'embedding_provider = "local"',
+            'vector_backend = "exact"',
+            "",
+        ]
+    )

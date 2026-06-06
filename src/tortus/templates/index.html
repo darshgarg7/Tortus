@@ -16,7 +16,7 @@
         </div>
         <div class="status-pill">
           <span class="pulse"></span>
-          Local v1 benchmark
+          Local v2 benchmark
         </div>
       </header>
 
@@ -103,6 +103,122 @@
         </section>
       </section>
 
+      <section class="content-grid">
+        <section class="panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Candidate generation</p>
+              <h2>Seed hits</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Node</th>
+                  <th>Score</th>
+                  <th>Terms</th>
+                  <th>Components</th>
+                </tr>
+              </thead>
+              <tbody id="seed-table">
+                <tr><td colspan="4" class="muted">No query has been run yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Portal policy</p>
+              <h2>Portal decisions</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Score</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody id="portal-table">
+                <tr><td colspan="5" class="muted">No query has been run yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="panel trace-panel">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Pruning</p>
+            <h2>Rejected candidates</h2>
+          </div>
+          <div class="filters">
+            <select id="edge-filter" aria-label="edge type filter">
+              <option value="">all edges</option>
+              <option value="portal">portal</option>
+              <option value="related_to">related_to</option>
+              <option value="supports">supports</option>
+              <option value="depends_on">depends_on</option>
+            </select>
+            <input id="source-filter" type="search" placeholder="source or reason">
+            <input id="score-filter" type="number" min="0" max="10" step="0.1" value="0" aria-label="minimum score">
+            <label><input id="portal-only" type="checkbox"> portal only</label>
+            <label><input id="pruned-only" type="checkbox" checked> pruned only</label>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>From</th>
+                <th>To</th>
+                <th>Edge</th>
+                <th>Score</th>
+                <th>Terms</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody id="pruned-table">
+              <tr><td colspan="6" class="muted">No query has been run yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <section class="panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Score breakdown</p>
+              <h2>Top hop components</h2>
+            </div>
+          </div>
+          <div id="score-components" class="metric-grid">
+            <p class="muted">Run a query to inspect hop score components.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Claim support</p>
+              <h2>Unsupported claims</h2>
+            </div>
+          </div>
+          <ul id="unsupported-list" class="unsupported-list">
+            <li>No query has been run yet.</li>
+          </ul>
+        </section>
+      </section>
+
       <section class="panel evidence-panel">
         <div class="section-head">
           <div>
@@ -112,6 +228,18 @@
         </div>
         <div id="evidence-list" class="evidence-list">
           <p class="muted">Evidence spans will appear after the first query.</p>
+        </div>
+      </section>
+
+      <section class="panel evidence-panel">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Claims</p>
+            <h2>Answer claim support</h2>
+          </div>
+        </div>
+        <div id="claim-list" class="claim-list">
+          <p class="muted">Claim support will appear after the first query.</p>
         </div>
       </section>
     </main>

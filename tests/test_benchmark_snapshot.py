@@ -30,5 +30,11 @@ def test_smoke_benchmark_stays_within_snapshot_thresholds(tmp_path) -> None:
             assert summary.faithfulness >= thresholds["min_faithfulness"]
         if "min_source_recall" in thresholds:
             assert summary.source_recall >= thresholds["min_source_recall"]
+        if "min_path_recall" in thresholds:
+            assert summary.path_recall >= thresholds["min_path_recall"]
+        if "min_path_precision" in thresholds:
+            assert summary.path_precision >= thresholds["min_path_precision"]
+        if "max_mean_shard_fanout" in thresholds:
+            assert summary.mean_shard_fanout <= thresholds["max_mean_shard_fanout"]
         if "max_mean_portal_hops" in thresholds:
             assert summary.mean_portal_hops <= thresholds["max_mean_portal_hops"]

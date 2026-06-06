@@ -1,9 +1,13 @@
 """Baseline retrieval strategies for Tortus evaluation."""
 
 import math
+import os
+import shlex
+import subprocess
 import time
 from collections import Counter
 from hashlib import sha1
+from importlib import metadata, util
 
 from pydantic import BaseModel, Field
 
@@ -22,18 +26,31 @@ from .text import tokenize
 from .torus import torus_distance
 from .traversal import QueryEngine, dedupe_evidence, estimate_tokens, synthesize_evidence_answer
 
-STRATEGIES = (
+LOCAL_STRATEGIES = (
     "tortus_torus",
-    "vector_only",
-    "bm25",
-    "hybrid_dense_bm25",
+    "vector_only_local",
+    "bm25_local",
+    "hybrid_dense_bm25_local",
     "graph_local",
-    "community_summary",
-    "bounded_agentic",
-    "torus_layout",
-    "euclidean_layout",
-    "random_layout",
+    "community_summary_local",
+    "bounded_agentic_local",
+    "torus_layout_local",
+    "euclidean_layout_local",
+    "random_layout_local",
 )
+EXTERNAL_STRATEGIES = ("graphrag_external",)
+STRATEGIES = LOCAL_STRATEGIES
+ALL_STRATEGIES = LOCAL_STRATEGIES + EXTERNAL_STRATEGIES
+STRATEGY_ALIASES = {
+    "vector_only": "vector_only_local",
+    "bm25": "bm25_local",
+    "hybrid_dense_bm25": "hybrid_dense_bm25_local",
+    "community_summary": "community_summary_local",
+    "bounded_agentic": "bounded_agentic_local",
+    "torus_layout": "torus_layout_local",
+    "euclidean_layout": "euclidean_layout_local",
+    "random_layout": "random_layout_local",
+}
 
 
 class StrategyRun(BaseModel):
@@ -52,6 +69,9 @@ class StrategyRun(BaseModel):
     portal_hops: int = 0
     shard_crossings: int = 0
     warnings: list[str] = Field(default_factory=list)
+    external: bool = False
+    skipped: bool = False
+    metadata: dict[str, str] = Field(default_factory=dict)
 
 
 def run_strategy(
@@ -62,14 +82,15 @@ def run_strategy(
     top_k: int = 5,
 ) -> StrategyRun:
     """Dispatch a retrieval strategy by name."""
+    strategy = STRATEGY_ALIASES.get(strategy, strategy)
     if strategy == "tortus_torus":
         return run_tortus(engine, query, policy)
-    if strategy == "vector_only":
-        return run_vector_only(engine, query, top_k=top_k)
-    if strategy == "bm25":
-        return run_bm25(engine.graph, query, top_k=top_k)
-    if strategy == "hybrid_dense_bm25":
-        return run_hybrid_dense_bm25(engine, query, top_k=top_k)
+    if strategy == "vector_only_local":
+        return run_vector_only(engine, query, top_k=top_k, strategy=strategy)
+    if strategy == "bm25_local":
+        return run_bm25(engine.graph, query, top_k=top_k, strategy=strategy)
+    if strategy == "hybrid_dense_bm25_local":
+        return run_hybrid_dense_bm25(engine, query, top_k=top_k, strategy=strategy)
     if strategy == "graph_local":
         return run_tortus(
             engine,
@@ -77,16 +98,18 @@ def run_strategy(
             policy.model_copy(update={"local_only": True}),
             strategy="graph_local",
         )
-    if strategy == "community_summary":
-        return run_community_summary(engine, query, top_k=top_k)
-    if strategy == "bounded_agentic":
-        return run_bounded_agentic(engine, query, policy=policy, top_k=top_k)
-    if strategy == "torus_layout":
-        return run_layout_probe(engine, query, distance="torus", top_k=top_k)
-    if strategy == "euclidean_layout":
-        return run_layout_probe(engine, query, distance="euclidean", top_k=top_k)
-    if strategy == "random_layout":
-        return run_layout_probe(engine, query, distance="random", top_k=top_k)
+    if strategy == "community_summary_local":
+        return run_community_summary(engine, query, top_k=top_k, strategy=strategy)
+    if strategy == "bounded_agentic_local":
+        return run_bounded_agentic(engine, query, policy=policy, top_k=top_k, strategy=strategy)
+    if strategy == "torus_layout_local":
+        return run_layout_probe(engine, query, distance="torus", top_k=top_k, strategy=strategy)
+    if strategy == "euclidean_layout_local":
+        return run_layout_probe(engine, query, distance="euclidean", top_k=top_k, strategy=strategy)
+    if strategy == "random_layout_local":
+        return run_layout_probe(engine, query, distance="random", top_k=top_k, strategy=strategy)
+    if strategy == "graphrag_external":
+        return run_graphrag_external(query, policy=policy)
     raise ValueError(f"unknown strategy: {strategy}")
 
 
@@ -119,7 +142,12 @@ def run_tortus(
     )
 
 
-def run_vector_only(engine: QueryEngine, query: str, top_k: int = 5) -> StrategyRun:
+def run_vector_only(
+    engine: QueryEngine,
+    query: str,
+    top_k: int = 5,
+    strategy: str = "vector_only_local",
+) -> StrategyRun:
     """Run dense retrieval without graph traversal."""
     started = time.perf_counter()
     query_vector = engine.embeddings.embed([query])[0]
@@ -127,7 +155,7 @@ def run_vector_only(engine: QueryEngine, query: str, top_k: int = 5) -> Strategy
     evidence = dedupe_evidence([span for hit in hits for span in hit.evidence])
     latency_ms = (time.perf_counter() - started) * 1000
     return StrategyRun(
-        strategy="vector_only",
+        strategy=strategy,
         hits=hits,
         evidence=evidence,
         answer=synthesize_evidence_answer(query, hits, evidence).answer,
@@ -139,7 +167,12 @@ def run_vector_only(engine: QueryEngine, query: str, top_k: int = 5) -> Strategy
     )
 
 
-def run_bm25(graph: GraphStore, query: str, top_k: int = 5) -> StrategyRun:
+def run_bm25(
+    graph: GraphStore,
+    query: str,
+    top_k: int = 5,
+    strategy: str = "bm25_local",
+) -> StrategyRun:
     """Run a lexical BM25 baseline over concept nodes."""
     started = time.perf_counter()
     nodes = graph.list_nodes()
@@ -153,7 +186,7 @@ def run_bm25(graph: GraphStore, query: str, top_k: int = 5) -> StrategyRun:
     evidence = dedupe_evidence([span for hit in hits for span in hit.evidence])
     latency_ms = (time.perf_counter() - started) * 1000
     return StrategyRun(
-        strategy="bm25",
+        strategy=strategy,
         hits=hits,
         evidence=evidence,
         answer=synthesize_evidence_answer(query, hits, evidence).answer,
@@ -166,7 +199,12 @@ def run_bm25(graph: GraphStore, query: str, top_k: int = 5) -> StrategyRun:
     )
 
 
-def run_hybrid_dense_bm25(engine: QueryEngine, query: str, top_k: int = 5) -> StrategyRun:
+def run_hybrid_dense_bm25(
+    engine: QueryEngine,
+    query: str,
+    top_k: int = 5,
+    strategy: str = "hybrid_dense_bm25_local",
+) -> StrategyRun:
     """Run a weighted dense plus BM25 hybrid retrieval baseline."""
     started = time.perf_counter()
     nodes = engine.graph.list_nodes()
@@ -194,7 +232,7 @@ def run_hybrid_dense_bm25(engine: QueryEngine, query: str, top_k: int = 5) -> St
     ]
     evidence = dedupe_evidence([span for hit in hits for span in hit.evidence])
     return StrategyRun(
-        strategy="hybrid_dense_bm25",
+        strategy=strategy,
         hits=hits,
         evidence=evidence,
         answer=synthesize_evidence_answer(query, hits, evidence).answer,
@@ -206,7 +244,12 @@ def run_hybrid_dense_bm25(engine: QueryEngine, query: str, top_k: int = 5) -> St
     )
 
 
-def run_community_summary(engine: QueryEngine, query: str, top_k: int = 5) -> StrategyRun:
+def run_community_summary(
+    engine: QueryEngine,
+    query: str,
+    top_k: int = 5,
+    strategy: str = "community_summary_local",
+) -> StrategyRun:
     """Run a local community-summary-style retrieval approximation."""
     started = time.perf_counter()
     nodes = engine.graph.list_nodes()
@@ -231,7 +274,7 @@ def run_community_summary(engine: QueryEngine, query: str, top_k: int = 5) -> St
     ]
     evidence = dedupe_evidence([span for hit in hits for span in hit.evidence])
     return StrategyRun(
-        strategy="community_summary",
+        strategy=strategy,
         hits=hits,
         evidence=evidence,
         answer=synthesize_evidence_answer(query, hits, evidence).answer,
@@ -249,6 +292,7 @@ def run_bounded_agentic(
     query: str,
     policy: TraversalPolicy,
     top_k: int = 5,
+    strategy: str = "bounded_agentic_local",
 ) -> StrategyRun:
     """Run a deterministic bounded-agentic search approximation."""
     started = time.perf_counter()
@@ -316,7 +360,7 @@ def run_bounded_agentic(
     evidence = dedupe_evidence(evidence)
     shard_simulator = ToroidalShardSimulator()
     return StrategyRun(
-        strategy="bounded_agentic",
+        strategy=strategy,
         hits=visited_hits,
         evidence=evidence[:10],
         answer=synthesize_evidence_answer(query, visited_hits, evidence).answer,
@@ -337,6 +381,7 @@ def run_layout_probe(
     query: str,
     distance: str,
     top_k: int = 5,
+    strategy: str | None = None,
 ) -> StrategyRun:
     """Run a layout-distance retrieval probe."""
     started = time.perf_counter()
@@ -344,7 +389,7 @@ def run_layout_probe(
     seed_hits = engine.index.search(query_vector, top_k=1)
     if not seed_hits:
         return StrategyRun(
-            strategy=f"{distance}_layout",
+            strategy=strategy or f"{distance}_layout_local",
             latency_ms=(time.perf_counter() - started) * 1000,
             nodes_visited=0,
             hops_taken=0,
@@ -361,7 +406,7 @@ def run_layout_probe(
     ]
     evidence = dedupe_evidence([span for hit in hits for span in hit.evidence])
     return StrategyRun(
-        strategy=f"{distance}_layout",
+        strategy=strategy or f"{distance}_layout_local",
         hits=hits,
         evidence=evidence,
         answer=synthesize_evidence_answer(query, hits, evidence).answer,
@@ -370,6 +415,91 @@ def run_layout_probe(
         hops_taken=0,
         shard_fanout=shard_fanout_for_hits(engine.graph, hits),
         tokens_estimated=estimate_tokens(query, evidence),
+    )
+
+
+def run_graphrag_external(query: str, policy: TraversalPolicy) -> StrategyRun:
+    """Run an optional Microsoft GraphRAG external adapter when configured."""
+    started = time.perf_counter()
+    metadata_payload: dict[str, str] = {
+        "adapter": "microsoft-graphrag",
+        "config": "TORTUS_GRAPHRAG_COMMAND",
+    }
+    if util.find_spec("graphrag") is None:
+        return StrategyRun(
+            strategy="graphrag_external",
+            answer="",
+            latency_ms=(time.perf_counter() - started) * 1000,
+            nodes_visited=0,
+            hops_taken=0,
+            shard_fanout=0,
+            tokens_estimated=estimate_tokens(query, []),
+            warnings=["GraphRAG external baseline skipped: graphrag package is not installed."],
+            external=True,
+            skipped=True,
+            metadata=metadata_payload,
+        )
+
+    try:
+        metadata_payload["dependency_version"] = metadata.version("graphrag")
+    except metadata.PackageNotFoundError:
+        metadata_payload["dependency_version"] = "unknown"
+
+    command_template = os.environ.get("TORTUS_GRAPHRAG_COMMAND", "")
+    if not command_template:
+        return StrategyRun(
+            strategy="graphrag_external",
+            answer="",
+            latency_ms=(time.perf_counter() - started) * 1000,
+            nodes_visited=0,
+            hops_taken=0,
+            shard_fanout=0,
+            tokens_estimated=estimate_tokens(query, []),
+            warnings=[
+                "GraphRAG external baseline skipped: set TORTUS_GRAPHRAG_COMMAND "
+                "to a command template containing {query}."
+            ],
+            external=True,
+            skipped=True,
+            metadata=metadata_payload,
+        )
+
+    command = command_template.format(query=shlex.quote(query))
+    completed = subprocess.run(
+        command,
+        shell=True,
+        text=True,
+        capture_output=True,
+        timeout=max(1.0, policy.max_ms / 1000),
+        check=False,
+    )
+    if completed.returncode != 0:
+        return StrategyRun(
+            strategy="graphrag_external",
+            answer="",
+            latency_ms=(time.perf_counter() - started) * 1000,
+            nodes_visited=0,
+            hops_taken=0,
+            shard_fanout=0,
+            tokens_estimated=estimate_tokens(query, []),
+            warnings=[f"GraphRAG external baseline failed: {completed.stderr.strip()}"],
+            external=True,
+            skipped=True,
+            metadata=metadata_payload,
+        )
+    answer = completed.stdout.strip()
+    return StrategyRun(
+        strategy="graphrag_external",
+        answer=answer,
+        latency_ms=(time.perf_counter() - started) * 1000,
+        nodes_visited=0,
+        hops_taken=0,
+        shard_fanout=0,
+        tokens_estimated=estimate_tokens(query, []),
+        warnings=[],
+        external=True,
+        skipped=False,
+        metadata=metadata_payload,
     )
 
 

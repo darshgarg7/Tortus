@@ -143,7 +143,7 @@ class TraversalPolicy(BaseModel):
 
     max_hops: int = Field(default=3, ge=0, le=8)
     max_nodes: int = Field(default=64, ge=1, le=1000)
-    max_portal_hops: int = Field(default=8, ge=0, le=64)
+    max_portal_hops: int = Field(default=5, ge=0, le=64)
     max_ms: int = Field(default=1500, ge=1)
     max_tokens: int = Field(default=2500, ge=128)
     local_only: bool = False
@@ -178,6 +178,53 @@ class ReasoningHop(BaseModel):
     score_components: dict[str, float] = Field(default_factory=dict)
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class PrunedCandidate(BaseModel):
+    """A traversal candidate that was considered but not selected."""
+
+    from_node: str
+    to_node: str
+    edge_type: EdgeType
+    score: float = 0.0
+    reason: str
+    matched_terms: list[str] = Field(default_factory=list)
+    torus_distance: float | None = None
+    score_components: dict[str, float] = Field(default_factory=dict)
+
+
+class PortalDecision(BaseModel):
+    """A selected or rejected portal traversal decision."""
+
+    from_node: str
+    to_node: str
+    selected: bool
+    score: float = 0.0
+    reason: str
+    matched_terms: list[str] = Field(default_factory=list)
+    score_components: dict[str, float] = Field(default_factory=dict)
+
+
+class AnswerClaim(BaseModel):
+    """A sentence-level answer claim with evidence support telemetry."""
+
+    text: str
+    supported: bool
+    support_count: int = 0
+    evidence_uris: list[str] = Field(default_factory=list)
+
+
+class RetrievalTrace(BaseModel):
+    """Typed diagnostics for a full retrieval and synthesis run."""
+
+    query_terms: list[str] = Field(default_factory=list)
+    seed_hits: list[SearchHit] = Field(default_factory=list)
+    selected_hops: list[ReasoningHop] = Field(default_factory=list)
+    pruned_candidates: list[PrunedCandidate] = Field(default_factory=list)
+    portal_decisions: list[PortalDecision] = Field(default_factory=list)
+    evidence_spans: list[EvidenceSpan] = Field(default_factory=list)
+    answer_claims: list[AnswerClaim] = Field(default_factory=list)
+    unsupported_claims: list[AnswerClaim] = Field(default_factory=list)
 
 
 class BudgetStats(BaseModel):
@@ -215,4 +262,5 @@ class AnswerResult(BaseModel):
     budget: BudgetStats
     warnings: list[str] = Field(default_factory=list)
     baseline_comparison: list[BaselineComparison] = Field(default_factory=list)
+    trace: RetrievalTrace = Field(default_factory=RetrievalTrace)
     diagnostics: dict[str, Any] = Field(default_factory=dict)
