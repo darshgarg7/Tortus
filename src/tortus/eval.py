@@ -2,19 +2,21 @@
 
 import json
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from .baselines import STRATEGIES, run_strategy
+from .baselines import ALL_STRATEGIES, STRATEGIES, STRATEGY_ALIASES, run_strategy
 from .models import TraversalPolicy
+from .text import token_set
 from .traversal import QueryEngine
 
 
 @dataclass(frozen=True)
 class EvalQuestion:
-    """Represent EvalQuestion data."""
+    """One labeled retrieval evaluation question."""
 
     id: str
     suite: str
@@ -22,6 +24,8 @@ class EvalQuestion:
     expected_terms: tuple[str, ...]
     expected_sources: tuple[str, ...]
     expected_edge_types: tuple[str, ...] = ()
+    expect_answer: bool = True
+    audit_status: str = "built_in"
 
 
 SMOKE_QUESTIONS = (
@@ -238,9 +242,30 @@ STRESS_QUESTIONS = (
     ),
 )
 
+NEGATIVE_QUESTIONS = (
+    EvalQuestion(
+        id="negative-unrelated-weather",
+        suite="negative",
+        question="What is tomorrow's weather forecast for Chicago?",
+        expected_terms=(),
+        expected_sources=(),
+        expected_edge_types=(),
+        expect_answer=False,
+    ),
+    EvalQuestion(
+        id="negative-unsupported-finance",
+        suite="negative",
+        question="Which stock should I buy after the token migration incident?",
+        expected_terms=(),
+        expected_sources=(),
+        expected_edge_types=(),
+        expect_answer=False,
+    ),
+)
+
 
 class EvalRow(BaseModel):
-    """Represent EvalRow data."""
+    """Scored result row for one question and strategy."""
 
     question_id: str
     suite: str
@@ -248,6 +273,8 @@ class EvalRow(BaseModel):
     term_recall: float
     source_recall: float
     path_recall: float
+    path_precision: float = 0.0
+    faithfulness: float = 0.0
     latency_ms: float
     nodes_visited: int
     hops_taken: int
@@ -255,16 +282,31 @@ class EvalRow(BaseModel):
     shard_fanout: int
     shard_crossings: int = 0
     tokens_estimated: int
+    path_edge_types: list[str] = Field(default_factory=list)
     warnings: list[str]
+    expect_answer: bool = True
+    audit_status: str = "built_in"
+    external: bool = False
+    skipped: bool = False
+    strategy_metadata: dict[str, str] = Field(default_factory=dict)
 
     @property
     def passed(self) -> bool:
-        """Return passed."""
-        return self.term_recall >= 0.5 and self.source_recall >= 0.5 and self.path_recall >= 0.5
+        """Return whether this row satisfies the evaluation threshold."""
+        if self.skipped:
+            return False
+        if not self.expect_answer:
+            return self.faithfulness >= 1.0 and self.source_recall >= 1.0
+        return (
+            self.term_recall >= 0.5
+            and self.source_recall >= 0.5
+            and self.path_recall >= 0.5
+            and self.faithfulness >= 0.5
+        )
 
 
 class EvalReport(BaseModel):
-    """Represent EvalReport data."""
+    """Collection of scored evaluation rows."""
 
     suite: str
     rows: list[EvalRow]
@@ -286,7 +328,7 @@ def run_eval(
     suite: str = "smoke",
     strategies: tuple[str, ...] = STRATEGIES,
 ) -> EvalReport:
-    """Run run eval."""
+    """Run a suite across selected retrieval strategies."""
     rows: list[EvalRow] = []
     policy = TraversalPolicy(max_hops=3, max_nodes=32)
     questions = questions_for_suite(suite)
@@ -305,14 +347,38 @@ def run_eval(
                 if question.expected_edge_types
                 else 1.0
             )
+            term_recall = (
+                term_hits / len(question.expected_terms)
+                if question.expected_terms
+                else 1.0
+            )
+            source_recall = (
+                source_hits / len(question.expected_sources)
+                if question.expected_sources
+                else (1.0 if not returned_sources else 0.0)
+            )
+            path_precision = score_path_precision(
+                run.path_edge_types,
+                returned_sources,
+                question.expected_edge_types,
+                question.expected_sources,
+            )
+            faithfulness = score_faithfulness(
+                query=question.question,
+                answer=run.answer,
+                evidence=run.evidence,
+                expect_answer=question.expect_answer,
+            )
             rows.append(
                 EvalRow(
                     question_id=question.id,
                     suite=question.suite,
                     strategy=strategy,
-                    term_recall=term_hits / len(question.expected_terms),
-                    source_recall=source_hits / len(question.expected_sources),
+                    term_recall=term_recall,
+                    source_recall=source_recall,
                     path_recall=path_recall,
+                    path_precision=path_precision,
+                    faithfulness=faithfulness,
                     latency_ms=latency_ms,
                     nodes_visited=run.nodes_visited,
                     hops_taken=run.hops_taken,
@@ -320,7 +386,13 @@ def run_eval(
                     shard_fanout=run.shard_fanout,
                     shard_crossings=run.shard_crossings,
                     tokens_estimated=run.tokens_estimated,
+                    path_edge_types=run.path_edge_types,
                     warnings=run.warnings,
+                    expect_answer=question.expect_answer,
+                    audit_status=question.audit_status,
+                    external=run.external,
+                    skipped=run.skipped,
+                    strategy_metadata=run.metadata,
                 )
             )
     return EvalReport(suite=suite, rows=rows)
@@ -330,34 +402,37 @@ def run_smoke_eval(
     engine: QueryEngine,
     strategies: tuple[str, ...] = STRATEGIES,
 ) -> EvalReport:
-    """Run run smoke eval."""
+    """Run the smoke suite across selected strategies."""
     return run_eval(engine, suite="smoke", strategies=strategies)
 
 
 def questions_for_suite(suite: str) -> tuple[EvalQuestion, ...]:
-    """Return questions for suite."""
+    """Return labeled questions for a named suite."""
     if suite == "smoke":
         return SMOKE_QUESTIONS
     if suite == "golden":
         return GOLDEN_QUESTIONS
     if suite == "stress":
         return STRESS_QUESTIONS
+    if suite == "negative":
+        return NEGATIVE_QUESTIONS
     if suite == "golden100":
         return load_json_questions(Path("data/golden_set.json"))
     if suite == "full":
-        return SMOKE_QUESTIONS + GOLDEN_QUESTIONS + STRESS_QUESTIONS
+        return SMOKE_QUESTIONS + GOLDEN_QUESTIONS + STRESS_QUESTIONS + NEGATIVE_QUESTIONS
     if suite == "benchmark":
         return (
             SMOKE_QUESTIONS
             + GOLDEN_QUESTIONS
             + STRESS_QUESTIONS
+            + NEGATIVE_QUESTIONS
             + load_json_questions(Path("data/golden_set.json"))
         )
     raise ValueError(f"unknown eval suite: {suite}")
 
 
 def load_json_questions(path: Path) -> tuple[EvalQuestion, ...]:
-    """Load load json questions."""
+    """Load labeled questions from a JSON golden-set file."""
     if not path.exists():
         return ()
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -369,17 +444,62 @@ def load_json_questions(path: Path) -> tuple[EvalQuestion, ...]:
             expected_terms=tuple(str(term) for term in row["expected_terms"]),
             expected_sources=tuple(str(source) for source in row["expected_sources"]),
             expected_edge_types=tuple(str(edge) for edge in row.get("expected_edge_types", ())),
+            expect_answer=bool(row.get("expect_answer", True)),
+            audit_status=str(row.get("audit_status", "curated_pending_human_signoff")),
         )
         for row in payload
     )
 
 
+def score_path_precision(
+    returned_edge_types: list[str],
+    returned_sources: set[str],
+    expected_edge_types: tuple[str, ...],
+    expected_sources: tuple[str, ...],
+) -> float:
+    """Estimate how much of a returned path is relevant to the expected labels."""
+    if not returned_edge_types:
+        return 1.0 if not expected_edge_types else 0.0
+    expected_edges = set(expected_edge_types)
+    expected_source_set = set(expected_sources)
+    edge_matches = sum(edge_type in expected_edges for edge_type in returned_edge_types)
+    source_bonus = 1 if returned_sources.intersection(expected_source_set) else 0
+    return min(1.0, (edge_matches + source_bonus) / max(1, len(returned_edge_types)))
+
+
+def score_faithfulness(
+    query: str,
+    answer: str,
+    evidence: Sequence[object],
+    expect_answer: bool,
+) -> float:
+    """Score whether an answer is supported by its selected evidence."""
+    withheld = "could not find enough source-backed evidence" in answer.lower()
+    if not expect_answer:
+        return 1.0 if withheld or not evidence else 0.0
+    if withheld or not evidence:
+        return 0.0
+    answer_terms = token_set(answer)
+    evidence_terms = token_set(" ".join(str(getattr(span, "text", "")) for span in evidence))
+    query_terms = token_set(query)
+    support_terms = answer_terms - query_terms
+    if not support_terms:
+        return 1.0
+    supported = len(support_terms.intersection(evidence_terms))
+    return supported / len(support_terms)
+
+
 def parse_strategies(value: str) -> tuple[str, ...]:
-    """Parse parse strategies."""
+    """Parse a comma-separated strategy selection."""
     if value == "all":
         return STRATEGIES
+    if value in {"external", "external_only"}:
+        return tuple(strategy for strategy in ALL_STRATEGIES if strategy.endswith("_external"))
+    if value in {"all_with_external", "all-external"}:
+        return ALL_STRATEGIES
     requested = tuple(item.strip() for item in value.split(",") if item.strip())
-    unknown = sorted(set(requested) - set(STRATEGIES))
+    canonical = tuple(STRATEGY_ALIASES.get(item, item) for item in requested)
+    unknown = sorted(set(canonical) - set(ALL_STRATEGIES))
     if unknown:
         raise ValueError(f"unknown eval strategies: {', '.join(unknown)}")
-    return requested
+    return canonical

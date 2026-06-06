@@ -12,7 +12,7 @@ from .config import Settings
 
 
 class EmbeddingProvider(Protocol):
-    """Represent EmbeddingProvider data."""
+    """Protocol implemented by embedding providers."""
 
     dimensions: int
 
@@ -28,7 +28,7 @@ class LocalHashEmbeddingProvider:
         self.dimensions = dimensions
 
     def embed(self, texts: list[str]) -> np.ndarray:
-        """Return embed."""
+        """Embed texts with deterministic signed token hashing."""
         matrix = np.zeros((len(texts), self.dimensions), dtype=np.float32)
         for row, text in enumerate(texts):
             for token in text.lower().split():
@@ -40,7 +40,7 @@ class LocalHashEmbeddingProvider:
 
 
 class AzureOpenAIEmbeddingProvider:
-    """Represent AzureOpenAIEmbeddingProvider data."""
+    """Azure OpenAI embedding adapter."""
 
     def __init__(self, settings: Settings) -> None:
         """Initialize the Azure OpenAI embedding client."""
@@ -57,7 +57,7 @@ class AzureOpenAIEmbeddingProvider:
         self.dimensions = 0
 
     def embed(self, texts: list[str]) -> np.ndarray:
-        """Return embed."""
+        """Embed texts with the configured Azure OpenAI deployment."""
         response = self.client.embeddings.create(model=self.model, input=texts)
         matrix = np.array([item.embedding for item in response.data], dtype=np.float32)
         self.dimensions = matrix.shape[1]
@@ -65,7 +65,7 @@ class AzureOpenAIEmbeddingProvider:
 
 
 class CachedEmbeddingProvider:
-    """Represent CachedEmbeddingProvider data."""
+    """File-backed embedding cache wrapper."""
 
     def __init__(self, provider: EmbeddingProvider, cache_dir: Path) -> None:
         """Initialize the embedding provider cache."""
@@ -75,7 +75,7 @@ class CachedEmbeddingProvider:
         self.dimensions = provider.dimensions
 
     def embed(self, texts: list[str]) -> np.ndarray:
-        """Return embed."""
+        """Return cached embeddings, computing and saving misses."""
         rows: list[np.ndarray] = []
         missing: list[str] = []
         missing_keys: list[str] = []
@@ -107,7 +107,7 @@ def cache_key(text: str) -> str:
 
 
 def normalize(matrix: np.ndarray) -> np.ndarray:
-    """Normalize normalize."""
+    """Return row-wise L2-normalized vectors."""
     if matrix.size == 0:
         return matrix.astype(np.float32)
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)
@@ -116,7 +116,7 @@ def normalize(matrix: np.ndarray) -> np.ndarray:
 
 
 def build_embedding_provider(settings: Settings) -> EmbeddingProvider:
-    """Build build embedding provider."""
+    """Build the configured embedding provider with a local cache."""
     provider_name = settings.tortus_embedding_provider.lower()
     if provider_name == "azure":
         provider: EmbeddingProvider = AzureOpenAIEmbeddingProvider(settings)

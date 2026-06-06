@@ -8,7 +8,7 @@ from .models import ConceptNode, ReasoningHop, TorusCoordinate
 
 @dataclass(frozen=True)
 class ShardAssignment:
-    """Represent ShardAssignment data."""
+    """Deterministic assignment of a node to a toroidal shard."""
 
     node_id: str
     shard_id: str
@@ -27,7 +27,7 @@ class ToroidalShardSimulator:
         self.columns = columns
 
     def assign(self, node: ConceptNode) -> ShardAssignment:
-        """Assign assign."""
+        """Assign one node to a toroidal grid cell."""
         coordinate = node.torus or TorusCoordinate(theta=0.0, phi=0.0)
         column = min(self.columns - 1, int((coordinate.theta % math.tau) / math.tau * self.columns))
         row = min(self.rows - 1, int((coordinate.phi % math.tau) / math.tau * self.rows))
@@ -39,15 +39,15 @@ class ToroidalShardSimulator:
         )
 
     def assignments(self, nodes: list[ConceptNode]) -> dict[str, ShardAssignment]:
-        """Return assignments."""
+        """Return shard assignments keyed by node id."""
         return {node.id: self.assign(node) for node in nodes}
 
     def fanout_for_nodes(self, nodes: list[ConceptNode]) -> int:
-        """Return fanout for nodes."""
+        """Return the number of unique shards touched by nodes."""
         return len({self.assign(node).shard_id for node in nodes})
 
     def fanout_for_node_ids(self, node_ids: list[str], nodes: list[ConceptNode]) -> int:
-        """Return fanout for node ids."""
+        """Return unique shard fanout for a set of node ids."""
         by_id = {node.id: node for node in nodes}
         touched = [by_id[node_id] for node_id in node_ids if node_id in by_id]
         return self.fanout_for_nodes(touched)

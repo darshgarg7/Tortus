@@ -3,13 +3,23 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "tortus"
+name = "tortus-rag"
 version = "0.1.0"
 description = "Toroidal semantic graph retrieval for measurable multi-hop RAG trade-offs."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
 authors = [{ name = "Darsh Garg" }]
+keywords = ["rag", "retrieval", "graphrag", "knowledge-graph", "semantic-search"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules"
+]
 dependencies = [
   "duckdb>=1.1.3",
   "fastapi>=0.115.0",
@@ -27,14 +37,39 @@ dependencies = [
   "uvicorn>=0.32.0"
 ]
 
+[project.urls]
+Homepage = "https://github.com/darshgarg7/Tortus"
+Repository = "https://github.com/darshgarg7/Tortus"
+Issues = "https://github.com/darshgarg7/Tortus/issues"
+
 [project.optional-dependencies]
 dev = [
+  "beautifulsoup4>=4.12.3",
+  "build>=1.2.2",
   "hypothesis>=6.119.0",
   "mypy>=1.13.0",
+  "pypdf>=5.1.0",
   "pytest>=8.3.0,<9",
   "pytest-benchmark>=5.1.0",
   "pytest-cov>=6.0.0",
-  "ruff>=0.8.0"
+  "ruff>=0.8.0",
+  "trafilatura>=1.12.2",
+  "twine>=6.0.0"
+]
+ingest = [
+  "beautifulsoup4>=4.12.3",
+  "pypdf>=5.1.0",
+  "trafilatura>=1.12.2"
+]
+faiss = [
+  "faiss-cpu>=1.9.0"
+]
+baselines = [
+  "graphrag>=2.0.0"
+]
+release = [
+  "build>=1.2.2",
+  "twine>=6.0.0"
 ]
 
 [project.scripts]
@@ -42,6 +77,21 @@ tortus = "tortus.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tortus"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/tortus/**",
+  "tests/**",
+  "README.md",
+  "LICENSE",
+  "pyproject.toml",
+  ".env.example",
+  "data/golden_set.json",
+  "data/benchmark_snapshots/*.json",
+  "data/reports/eval-report.md",
+  "docs/**",
+  "scripts/**"
+]
 
 [tool.pytest.ini_options]
 addopts = "-q"

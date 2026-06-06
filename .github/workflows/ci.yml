@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - MVP-V2
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Mypy
+        run: mypy src/tortus scripts/run_pytest.py
+
+      - name: Pytest
+        run: python scripts/run_pytest.py
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Check distributions
+        run: twine check dist/*
+
+      - name: Wheel install smoke
+        run: |
+          python -m venv /tmp/tortus-wheel-smoke
+          /tmp/tortus-wheel-smoke/bin/python -m pip install --upgrade pip
+          /tmp/tortus-wheel-smoke/bin/python -m pip install dist/tortus_rag-*.whl
+          /tmp/tortus-wheel-smoke/bin/python -c "import tortus; print(tortus.__version__)"
+          TORTUS_DATA_DIR=/tmp/tortus-data TORTUS_CACHE_DIR=/tmp/tortus-cache /tmp/tortus-wheel-smoke/bin/tortus --help
+          TORTUS_DATA_DIR=/tmp/tortus-data TORTUS_CACHE_DIR=/tmp/tortus-cache /tmp/tortus-wheel-smoke/bin/tortus ingest --corpus engineering
+          TORTUS_DATA_DIR=/tmp/tortus-data TORTUS_CACHE_DIR=/tmp/tortus-cache /tmp/tortus-wheel-smoke/bin/tortus index --corpus engineering
+          TORTUS_DATA_DIR=/tmp/tortus-data TORTUS_CACHE_DIR=/tmp/tortus-cache /tmp/tortus-wheel-smoke/bin/tortus query "How did token migration connect authentication and tracing?"
+          TORTUS_DATA_DIR=/tmp/tortus-data TORTUS_CACHE_DIR=/tmp/tortus-cache /tmp/tortus-wheel-smoke/bin/tortus serve --dry-run

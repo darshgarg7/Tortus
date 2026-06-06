@@ -18,7 +18,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-002-audience-dashboard",
@@ -39,7 +41,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-003-token-projection-rollout",
@@ -60,7 +64,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-004-cache-distractor",
@@ -81,7 +87,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-005-sidecar-distractor",
@@ -102,7 +110,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-006-legacy-secret-cleanup",
@@ -122,7 +132,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-007-trace-sampling-distractor",
@@ -143,7 +155,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-008-runbook-correlation",
@@ -165,7 +179,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-009-policy-to-observability",
@@ -186,7 +202,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-010-gateway-boundary",
@@ -207,7 +225,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-011-auth-trace-incident",
@@ -228,7 +248,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-012-audience-dashboard",
@@ -249,7 +271,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-013-token-projection-rollout",
@@ -270,7 +294,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-014-cache-distractor",
@@ -291,7 +317,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-015-sidecar-distractor",
@@ -312,7 +340,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-016-legacy-secret-cleanup",
@@ -332,7 +362,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-017-trace-sampling-distractor",
@@ -353,7 +385,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-018-runbook-correlation",
@@ -375,7 +409,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-019-policy-to-observability",
@@ -396,7 +432,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-020-gateway-boundary",
@@ -417,7 +455,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-021-auth-trace-incident",
@@ -438,7 +478,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-022-audience-dashboard",
@@ -459,7 +501,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-023-token-projection-rollout",
@@ -480,7 +524,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-024-cache-distractor",
@@ -501,7 +547,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-025-sidecar-distractor",
@@ -522,7 +570,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-026-legacy-secret-cleanup",
@@ -542,7 +592,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-027-trace-sampling-distractor",
@@ -563,7 +615,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-028-runbook-correlation",
@@ -585,7 +639,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-029-policy-to-observability",
@@ -606,7 +662,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-030-gateway-boundary",
@@ -627,7 +685,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-031-auth-trace-incident",
@@ -648,7 +708,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-032-audience-dashboard",
@@ -669,7 +731,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-033-token-projection-rollout",
@@ -690,7 +754,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-034-cache-distractor",
@@ -711,7 +777,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-035-sidecar-distractor",
@@ -732,7 +800,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-036-legacy-secret-cleanup",
@@ -752,7 +822,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-037-trace-sampling-distractor",
@@ -773,7 +845,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-038-runbook-correlation",
@@ -795,7 +869,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-039-policy-to-observability",
@@ -816,7 +892,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-040-gateway-boundary",
@@ -837,7 +915,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-041-auth-trace-incident",
@@ -858,7 +938,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-042-audience-dashboard",
@@ -879,7 +961,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-043-token-projection-rollout",
@@ -900,7 +984,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-044-cache-distractor",
@@ -921,7 +1007,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-045-sidecar-distractor",
@@ -942,7 +1030,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-046-legacy-secret-cleanup",
@@ -962,7 +1052,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-047-trace-sampling-distractor",
@@ -983,7 +1075,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-048-runbook-correlation",
@@ -1005,7 +1099,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-049-policy-to-observability",
@@ -1026,7 +1122,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-050-gateway-boundary",
@@ -1047,7 +1145,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-051-auth-trace-incident",
@@ -1068,7 +1168,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-052-audience-dashboard",
@@ -1089,7 +1191,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-053-token-projection-rollout",
@@ -1110,7 +1214,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-054-cache-distractor",
@@ -1131,7 +1237,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-055-sidecar-distractor",
@@ -1152,7 +1260,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-056-legacy-secret-cleanup",
@@ -1172,7 +1282,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-057-trace-sampling-distractor",
@@ -1193,7 +1305,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-058-runbook-correlation",
@@ -1215,7 +1329,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-059-policy-to-observability",
@@ -1236,7 +1352,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-060-gateway-boundary",
@@ -1257,7 +1375,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-061-auth-trace-incident",
@@ -1278,7 +1398,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-062-audience-dashboard",
@@ -1299,7 +1421,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-063-token-projection-rollout",
@@ -1320,7 +1444,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-064-cache-distractor",
@@ -1341,7 +1467,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-065-sidecar-distractor",
@@ -1362,7 +1490,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-066-legacy-secret-cleanup",
@@ -1382,7 +1512,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-067-trace-sampling-distractor",
@@ -1403,7 +1535,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-068-runbook-correlation",
@@ -1425,7 +1559,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-069-policy-to-observability",
@@ -1446,7 +1582,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-070-gateway-boundary",
@@ -1467,7 +1605,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-071-auth-trace-incident",
@@ -1488,7 +1628,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-072-audience-dashboard",
@@ -1509,7 +1651,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-073-token-projection-rollout",
@@ -1530,7 +1674,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-074-cache-distractor",
@@ -1551,7 +1697,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-075-sidecar-distractor",
@@ -1572,7 +1720,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-076-legacy-secret-cleanup",
@@ -1592,7 +1742,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-077-trace-sampling-distractor",
@@ -1613,7 +1765,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-078-runbook-correlation",
@@ -1635,7 +1789,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-079-policy-to-observability",
@@ -1656,7 +1812,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-080-gateway-boundary",
@@ -1677,7 +1835,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-081-auth-trace-incident",
@@ -1698,7 +1858,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-082-audience-dashboard",
@@ -1719,7 +1881,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-083-token-projection-rollout",
@@ -1740,7 +1904,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-084-cache-distractor",
@@ -1761,7 +1927,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-085-sidecar-distractor",
@@ -1782,7 +1950,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-086-legacy-secret-cleanup",
@@ -1802,7 +1972,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-087-trace-sampling-distractor",
@@ -1823,7 +1995,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-088-runbook-correlation",
@@ -1845,7 +2019,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-089-policy-to-observability",
@@ -1866,7 +2042,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-090-gateway-boundary",
@@ -1887,7 +2065,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-091-auth-trace-incident",
@@ -1908,7 +2088,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-092-audience-dashboard",
@@ -1929,7 +2111,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-093-token-projection-rollout",
@@ -1950,7 +2134,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-094-cache-distractor",
@@ -1971,7 +2157,9 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-095-sidecar-distractor",
@@ -1992,7 +2180,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-096-legacy-secret-cleanup",
@@ -2012,7 +2202,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-097-trace-sampling-distractor",
@@ -2033,7 +2225,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-098-runbook-correlation",
@@ -2055,7 +2249,9 @@
       "related_to"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-099-policy-to-observability",
@@ -2076,7 +2272,9 @@
       "portal"
     ],
     "hop_count_target": 2,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   },
   {
     "id": "golden100-100-gateway-boundary",
@@ -2097,6 +2295,8 @@
       "portal"
     ],
     "hop_count_target": 3,
-    "audit_status": "candidate_needs_human_review"
+    "expect_answer": true,
+    "audit_status": "curated_pending_human_signoff",
+    "audit_notes": "Source labels were curated from the bundled corpus scenario. Needs a human maintainer to verify evidence spans before publication."
   }
 ]

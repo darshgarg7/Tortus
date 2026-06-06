@@ -1,20 +1,26 @@
 """FastAPI, GraphQL, and dashboard routes for Tortus."""
 
 from collections import defaultdict
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import cast
 
 import strawberry
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from starlette.requests import Request
 from strawberry.fastapi import GraphQLRouter
+from strawberry.types import Info
 
-from .config import get_settings
+from .config import Settings, get_settings
 from .eval import EvalReport
-from .models import ConceptNode, SemanticEdge, TraversalPolicy
-from .pipeline import data_paths, load_engine, load_nodes
+from .models import ConceptNode, ReasoningHop, RetrievalTrace, SemanticEdge, TraversalPolicy
+from .pipeline import data_paths, load_engine
+from .traversal import QueryEngine
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
@@ -28,6 +34,14 @@ class EvidenceType:
     start: int
     end: int
     text: str
+
+
+@strawberry.type
+class ScoreComponentType:
+    """GraphQL key/value score component."""
+
+    key: str
+    value: float
 
 
 @strawberry.type
@@ -49,7 +63,7 @@ class AnswerPolicyInput:
 
     max_hops: int = 3
     max_nodes: int = 64
-    max_portal_hops: int = 8
+    max_portal_hops: int = 5
     max_ms: int = 1500
     local_only: bool = False
     explain_hops: bool = True
@@ -66,6 +80,10 @@ class BudgetType:
     shard_fanout: int
     shard_crossings: int
     tokens_estimated: int
+    candidates_considered: int
+    pruned_edges: int
+    portal_candidates: int
+    lexical_support: int
     truncated: bool
 
 
@@ -77,6 +95,73 @@ class HopType:
     to_node: str
     edge_type: str
     weight: float
+    score: float
+    reason: str
+    matched_terms: list[str]
+    torus_distance: float | None
+    score_components: list[ScoreComponentType]
+
+
+@strawberry.type
+class SearchHitType:
+    """GraphQL representation of a seed search hit."""
+
+    node_id: str
+    label: str
+    score: float
+    matched_terms: list[str]
+    score_components: list[ScoreComponentType]
+
+
+@strawberry.type
+class PrunedCandidateType:
+    """GraphQL representation of a rejected traversal candidate."""
+
+    from_node: str
+    to_node: str
+    edge_type: str
+    score: float
+    reason: str
+    matched_terms: list[str]
+    torus_distance: float | None
+    score_components: list[ScoreComponentType]
+
+
+@strawberry.type
+class PortalDecisionType:
+    """GraphQL representation of a selected or rejected portal decision."""
+
+    from_node: str
+    to_node: str
+    selected: bool
+    score: float
+    reason: str
+    matched_terms: list[str]
+    score_components: list[ScoreComponentType]
+
+
+@strawberry.type
+class AnswerClaimType:
+    """GraphQL representation of a sentence-level answer claim."""
+
+    text: str
+    supported: bool
+    support_count: int
+    evidence_uris: list[str]
+
+
+@strawberry.type
+class RetrievalTraceType:
+    """GraphQL representation of typed retrieval diagnostics."""
+
+    query_terms: list[str]
+    seed_hits: list[SearchHitType]
+    selected_hops: list[HopType]
+    pruned_candidates: list[PrunedCandidateType]
+    portal_decisions: list[PortalDecisionType]
+    evidence_spans: list[EvidenceType]
+    answer_claims: list[AnswerClaimType]
+    unsupported_claims: list[AnswerClaimType]
 
 
 @strawberry.type
@@ -89,6 +174,14 @@ class AnswerType:
     warnings: list[str]
     reasoning_path: list[HopType]
     evidence: list[EvidenceType]
+    trace: RetrievalTraceType
+
+
+class QueryRequest(BaseModel):
+    """JSON request for the dashboard query endpoint."""
+
+    query: str
+    policy: dict[str, object] | None = None
 
 
 @strawberry.type
@@ -96,24 +189,24 @@ class Query:
     """Top-level Tortus GraphQL query fields."""
 
     @strawberry.field
-    def concept(self, id: str) -> ConceptType | None:
+    def concept(self, info: Info, id: str) -> ConceptType | None:
         """Return a concept node by id."""
-        engine = load_engine(get_settings())
+        engine = engine_from_info(info)
         node = engine.graph.get_node(id)
         if node is None:
             return None
         return to_concept_type(node)
 
     @strawberry.field
-    def concepts(self) -> list[ConceptType]:
+    def concepts(self, info: Info) -> list[ConceptType]:
         """Return all concept nodes in the current graph."""
-        return [to_concept_type(node) for node in load_nodes(get_settings())]
+        return [to_concept_type(node) for node in engine_from_info(info).graph.list_nodes()]
 
     @strawberry.field
-    def answer(self, query: str, policy: AnswerPolicyInput | None = None) -> AnswerType:
+    def answer(self, info: Info, query: str, policy: AnswerPolicyInput | None = None) -> AnswerType:
         """Answer a query with bounded graph traversal and evidence paths."""
         policy = policy or AnswerPolicyInput()
-        result = load_engine(get_settings()).answer(
+        result = engine_from_info(info).answer(
             query,
             TraversalPolicy(
                 max_hops=policy.max_hops,
@@ -130,15 +223,11 @@ class Query:
             budget=BudgetType(**result.budget.model_dump()),
             warnings=result.warnings,
             reasoning_path=[
-                HopType(
-                    from_node=hop.from_node,
-                    to_node=hop.to_node,
-                    edge_type=hop.edge_type.value,
-                    weight=hop.weight,
-                )
+                to_hop_type(hop)
                 for hop in result.reasoning_path
             ],
             evidence=[EvidenceType(**span.model_dump()) for span in result.evidence],
+            trace=to_trace_type(result.trace),
         )
 
 
@@ -178,6 +267,91 @@ def edge_payload(edge: SemanticEdge) -> dict[str, object]:
         "edgeType": edge.edge_type.value,
         "weight": edge.weight,
     }
+
+
+def score_components_payload(components: dict[str, float]) -> list[ScoreComponentType]:
+    """Convert score component dicts to GraphQL key/value rows."""
+    return [
+        ScoreComponentType(key=key, value=value)
+        for key, value in sorted(components.items())
+    ]
+
+
+def to_hop_type(hop: ReasoningHop) -> HopType:
+    """Convert an internal reasoning hop to GraphQL DTO."""
+    return HopType(
+        from_node=hop.from_node,
+        to_node=hop.to_node,
+        edge_type=hop.edge_type.value,
+        weight=hop.weight,
+        score=hop.score,
+        reason=hop.reason,
+        matched_terms=hop.matched_terms,
+        torus_distance=hop.torus_distance,
+        score_components=score_components_payload(hop.score_components),
+    )
+
+
+def to_trace_type(trace: RetrievalTrace) -> RetrievalTraceType:
+    """Convert internal typed diagnostics to GraphQL DTOs."""
+    return RetrievalTraceType(
+        query_terms=trace.query_terms,
+        seed_hits=[
+            SearchHitType(
+                node_id=hit.node_id,
+                label=hit.label,
+                score=hit.score,
+                matched_terms=hit.matched_terms,
+                score_components=score_components_payload(hit.score_components),
+            )
+            for hit in trace.seed_hits
+        ],
+        selected_hops=[to_hop_type(hop) for hop in trace.selected_hops],
+        pruned_candidates=[
+            PrunedCandidateType(
+                from_node=candidate.from_node,
+                to_node=candidate.to_node,
+                edge_type=candidate.edge_type.value,
+                score=candidate.score,
+                reason=candidate.reason,
+                matched_terms=candidate.matched_terms,
+                torus_distance=candidate.torus_distance,
+                score_components=score_components_payload(candidate.score_components),
+            )
+            for candidate in trace.pruned_candidates
+        ],
+        portal_decisions=[
+            PortalDecisionType(
+                from_node=decision.from_node,
+                to_node=decision.to_node,
+                selected=decision.selected,
+                score=decision.score,
+                reason=decision.reason,
+                matched_terms=decision.matched_terms,
+                score_components=score_components_payload(decision.score_components),
+            )
+            for decision in trace.portal_decisions
+        ],
+        evidence_spans=[EvidenceType(**span.model_dump()) for span in trace.evidence_spans],
+        answer_claims=[
+            AnswerClaimType(
+                text=claim.text,
+                supported=claim.supported,
+                support_count=claim.support_count,
+                evidence_uris=claim.evidence_uris,
+            )
+            for claim in trace.answer_claims
+        ],
+        unsupported_claims=[
+            AnswerClaimType(
+                text=claim.text,
+                supported=claim.supported,
+                support_count=claim.support_count,
+                evidence_uris=claim.evidence_uris,
+            )
+            for claim in trace.unsupported_claims
+        ],
+    )
 
 
 def eval_summary_payload() -> list[dict[str, object]]:
@@ -226,9 +400,36 @@ def average(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
-def create_app() -> FastAPI:
+def int_policy_value(policy: dict[str, object], key: str, default: int) -> int:
+    """Read an integer policy field from untyped JSON payload data."""
+    value = policy.get(key, default)
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int | float | str):
+        return int(value)
+    return default
+
+
+def engine_from_info(info: Info) -> QueryEngine:
+    """Return the cached engine from the FastAPI app state."""
+    request = info.context["request"]
+    return cast(QueryEngine, request.app.state.engine)
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
     """Create the Tortus FastAPI app with GraphQL and dashboard routes."""
-    fastapi_app = FastAPI(title="Tortus")
+    settings = settings or get_settings()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        app.state.settings = settings
+        app.state.engine = load_engine(settings)
+        try:
+            yield
+        finally:
+            app.state.engine.graph.close()
+
+    fastapi_app = FastAPI(title="Tortus", lifespan=lifespan)
     schema = strawberry.Schema(query=Query)
     fastapi_app.include_router(GraphQLRouter(schema), prefix="/graphql")
     fastapi_app.mount(
@@ -254,7 +455,7 @@ def create_app() -> FastAPI:
     @fastapi_app.get("/api/graph")
     async def graph_data() -> dict[str, list[dict[str, object]]]:
         """Return graph nodes and edges for the Plotly dashboard."""
-        engine = load_engine(get_settings())
+        engine: QueryEngine = fastapi_app.state.engine
         return {
             "nodes": [node_payload(node) for node in engine.graph.list_nodes()],
             "edges": [edge_payload(edge) for edge in engine.graph.list_edges()],
@@ -264,5 +465,21 @@ def create_app() -> FastAPI:
     async def eval_summary() -> dict[str, list[dict[str, object]]]:
         """Return the latest strategy comparison summary."""
         return {"strategies": eval_summary_payload()}
+
+    @fastapi_app.post("/api/query")
+    async def query_data(payload: QueryRequest) -> dict[str, object]:
+        """Return an answer plus typed diagnostics for the dashboard."""
+        policy_payload = payload.policy or {}
+        policy = TraversalPolicy(
+            max_hops=int_policy_value(policy_payload, "max_hops", 3),
+            max_nodes=int_policy_value(policy_payload, "max_nodes", 64),
+            max_portal_hops=int_policy_value(policy_payload, "max_portal_hops", 5),
+            max_ms=int_policy_value(policy_payload, "max_ms", 1500),
+            local_only=bool(policy_payload.get("local_only", False)),
+            explain_hops=True,
+        )
+        engine: QueryEngine = fastapi_app.state.engine
+        result = engine.answer(payload.query, policy=policy)
+        return cast(dict[str, object], result.model_dump(mode="json"))
 
     return fastapi_app

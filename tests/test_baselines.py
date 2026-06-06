@@ -13,8 +13,12 @@ def test_tokenize_removes_question_words() -> None:
 
 def test_parse_strategies_all_and_subset() -> None:
     assert parse_strategies("all") == STRATEGIES
-    assert parse_strategies("bm25,vector_only") == ("bm25", "vector_only")
-    assert {"hybrid_dense_bm25", "community_summary", "bounded_agentic"}.issubset(set(STRATEGIES))
+    assert parse_strategies("bm25,vector_only") == ("bm25_local", "vector_only_local")
+    assert {
+        "hybrid_dense_bm25_local",
+        "community_summary_local",
+        "bounded_agentic_local",
+    }.issubset(set(STRATEGIES))
 
 
 def test_full_suite_includes_smoke_and_golden_questions() -> None:

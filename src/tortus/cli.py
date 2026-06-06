@@ -10,34 +10,99 @@ from rich.console import Console
 from rich.table import Table
 
 from .api import create_app
-from .config import get_settings
+from .audit import export_audit_suite, import_audit_records
+from .config import (
+    PROJECT_CONFIG_NAME,
+    default_project_config,
+    get_settings,
+    settings_with_overrides,
+)
+from .corpus_manifest import fetch_or_verify_public_corpus
 from .eval import EvalReport, parse_strategies, questions_for_suite, run_eval
 from .eval_store import write_eval_duckdb, write_eval_json
 from .golden import write_candidate_golden_set
 from .models import TraversalPolicy
-from .pipeline import build_index, data_paths, ingest_builtin, load_engine
+from .pipeline import build_index, data_paths, ingest_builtin, ingest_sources, load_engine
+from .release import run_doctor, run_release_check
 from .report import generate_markdown_report
 
 app = typer.Typer(help="Tortus: toroidal semantic graph retrieval.")
+corpus_app = typer.Typer(help="Pinned public corpus workflows.")
+audit_app = typer.Typer(help="Human audit import/export workflows.")
 console = Console()
+app.add_typer(corpus_app, name="corpus")
+app.add_typer(audit_app, name="audit")
 
 
 @app.command()
-def ingest(corpus: str = typer.Option("engineering", help="Corpus name to ingest.")) -> None:
-    """Ingest ingest."""
-    settings = get_settings()
-    documents, chunks = ingest_builtin(settings, corpus=corpus)
+def init(
+    force: bool = typer.Option(False, "--force", help="Overwrite an existing tortus.toml."),
+) -> None:
+    """Initialize a local Tortus workspace."""
+    config_path = Path(PROJECT_CONFIG_NAME)
+    if config_path.exists() and not force:
+        raise typer.BadParameter(
+            f"{PROJECT_CONFIG_NAME} already exists; pass --force to replace it"
+        )
+    config_path.write_text(default_project_config(), encoding="utf-8")
+    Path(".tortus/data").mkdir(parents=True, exist_ok=True)
+    Path(".tortus/cache").mkdir(parents=True, exist_ok=True)
+    console.print(f"initialized {config_path} and .tortus/")
+
+
+@app.command()
+def ingest(
+    sources: Annotated[
+        list[str] | None,
+        typer.Argument(help="Files, directories, or URLs to ingest into the workspace corpus."),
+    ] = None,
+    corpus: str | None = typer.Option(None, help="Built-in corpus name to ingest."),
+    manifest: Annotated[
+        Path | None,
+        typer.Option(help="TOML manifest containing sources to ingest."),
+    ] = None,
+    refresh: bool = typer.Option(False, "--refresh", help="Refetch URL sources."),
+    data_dir: Annotated[
+        Path | None,
+        typer.Option(help="Override TORTUS_DATA_DIR for this command."),
+    ] = None,
+) -> None:
+    """Ingest built-in fixtures or user-provided workspace sources."""
+    settings = settings_with_overrides(get_settings(), data_dir=data_dir)
+    source_values = sources or []
+    if source_values or manifest is not None:
+        settings = settings_with_overrides(settings, corpus="workspace")
+        result = ingest_sources(settings, source_values, manifest=manifest, refresh=refresh)
+        console.print(f"Ingested {result.documents} documents and {result.chunks} chunks")
+        console.print(f"snapshot={result.out_dir}")
+        console.print(f"manifest={result.manifest_path}")
+        for warning in result.warnings[:8]:
+            console.print(f"[yellow]warning:[/yellow] {warning}")
+        return
+
+    active_corpus = corpus or settings.tortus_corpus
+    if active_corpus == "workspace":
+        raise typer.BadParameter("workspace ingestion requires sources or --manifest")
+    settings = settings_with_overrides(settings, corpus=active_corpus)
+    documents, chunks = ingest_builtin(settings, corpus=active_corpus)
     corpus_dir = data_paths(settings)["corpus"]
     console.print(f"Ingested {documents} documents and {chunks} chunks into {corpus_dir}")
 
 
 @app.command()
-def index(layout: str = typer.Option("torus", help="Layout to build: torus.")) -> None:
+def index(
+    layout: str = typer.Option("torus", help="Layout to build: torus."),
+    corpus: str | None = typer.Option(None, help="Corpus name to index."),
+    data_dir: Annotated[
+        Path | None,
+        typer.Option(help="Override TORTUS_DATA_DIR for this command."),
+    ] = None,
+) -> None:
     """Build index."""
     if layout != "torus":
-        raise typer.BadParameter("only the torus layout is implemented in v0")
-    settings = get_settings()
-    stats = build_index(settings)
+        raise typer.BadParameter("only the torus layout is implemented in this release")
+    settings = settings_with_overrides(get_settings(), corpus=corpus, data_dir=data_dir)
+    stats = build_index(settings, corpus=settings.tortus_corpus)
     console.print("Built Tortus index")
     console.print_json(json.dumps(stats))
 
@@ -48,9 +113,15 @@ def query(
     explain: bool = typer.Option(False, "--explain", help="Print reasoning hops."),
     max_hops: int = typer.Option(3, help="Traversal hop budget."),
     local_only: bool = typer.Option(False, help="Disable portal hops."),
+    corpus: str | None = typer.Option(None, help="Corpus name to query."),
+    data_dir: Annotated[
+        Path | None,
+        typer.Option(help="Override TORTUS_DATA_DIR for this command."),
+    ] = None,
 ) -> None:
-    """Query query."""
-    engine = load_engine(get_settings())
+    """Run a query against the local Tortus engine."""
+    settings = settings_with_overrides(get_settings(), corpus=corpus, data_dir=data_dir)
+    engine = load_engine(settings)
     result = engine.answer(
         text,
         policy=TraversalPolicy(max_hops=max_hops, local_only=local_only, explain_hops=explain),
@@ -60,9 +131,17 @@ def query(
     if result.warnings:
         console.print("[yellow]warnings:[/yellow] " + "; ".join(result.warnings))
     if explain:
-        table = Table("from", "to", "edge", "weight")
+        table = Table("from", "to", "edge", "weight", "score", "terms", "reason")
         for hop in result.reasoning_path[:20]:
-            table.add_row(hop.from_node, hop.to_node, hop.edge_type.value, f"{hop.weight:.2f}")
+            table.add_row(
+                hop.from_node,
+                hop.to_node,
+                hop.edge_type.value,
+                f"{hop.weight:.2f}",
+                f"{hop.score:.2f}",
+                ", ".join(hop.matched_terms),
+                hop.reason,
+            )
         console.print(table)
 
 
@@ -82,7 +161,7 @@ def eval_command(
         typer.Option(help="Optional DuckDB path for eval rows."),
     ] = None,
 ) -> None:
-    """Build eval command."""
+    """Run an evaluation suite."""
     try:
         questions_for_suite(suite)
     except ValueError as exc:
@@ -145,7 +224,7 @@ def report_command(
         typer.Option(help="Output markdown report."),
     ] = Path("data/reports/eval-report.md"),
 ) -> None:
-    """Return report command."""
+    """Generate a markdown report from an eval JSON file."""
     if not eval_json.exists():
         raise typer.BadParameter(f"eval report does not exist: {eval_json}")
     report = EvalReport.model_validate_json(eval_json.read_text(encoding="utf-8"))
@@ -158,11 +237,11 @@ def report_command(
 def golden_set_command(
     out: Annotated[
         Path,
-        typer.Option(help="Output JSON path for candidate golden questions."),
+        typer.Option(help="Output JSON path for curated golden questions."),
     ] = Path("data/golden_set.json"),
     count: int = typer.Option(100, help="Number of candidate questions to generate."),
 ) -> None:
-    """Generate golden set command."""
+    """Generate the deterministic curated golden set."""
     write_candidate_golden_set(out, count=count)
     console.print(f"wrote_golden_set={out} count={count}")
 
@@ -171,13 +250,78 @@ def golden_set_command(
 def serve(
     host: str = typer.Option("127.0.0.1", help="Host to bind."),
     port: int = typer.Option(8000, help="Port to bind."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate app creation without binding."),
 ) -> None:
-    """Serve serve."""
-    uvicorn.run(create_app(), host=host, port=port)
+    """Serve the GraphQL API and dashboard."""
+    fastapi_app = create_app()
+    if dry_run:
+        console.print("Tortus app created successfully")
+        console.print(f"routes={len(fastapi_app.routes)}")
+        return
+    uvicorn.run(fastapi_app, host=host, port=port)
 
 
 @app.command()
 def paths() -> None:
-    """Print paths."""
+    """Print the active Tortus data paths."""
     for name, path in data_paths(get_settings()).items():
         console.print(f"{name}: {Path(path)}")
+
+
+@app.command()
+def doctor() -> None:
+    """Check installed package assets, optional dependencies, and data paths."""
+    table = Table("check", "ok", "detail")
+    failed = False
+    for check in run_doctor(get_settings()):
+        failed = failed or not check.ok and not check.name.startswith("optional dependency")
+        table.add_row(check.name, "yes" if check.ok else "no", check.detail)
+    console.print(table)
+    if failed:
+        raise typer.Exit(code=1)
+
+
+@app.command(name="release-check")
+def release_check() -> None:
+    """Build, inspect, install, and smoke-test release artifacts."""
+    for message in run_release_check(Path.cwd()):
+        console.print(message)
+
+
+@corpus_app.command(name="fetch")
+def corpus_fetch(
+    fetch: bool = typer.Option(False, "--fetch", help="Fetch live public source snapshots."),
+    refresh: bool = typer.Option(False, "--refresh", help="Refetch existing live snapshots."),
+) -> None:
+    """Verify or fetch the pinned public corpus manifest."""
+    result = fetch_or_verify_public_corpus(get_settings(), fetch=fetch, refresh=refresh)
+    console.print(f"sources={result.sources} fetched={result.fetched}")
+    console.print(f"manifest={result.out_path}")
+    for warning in result.warnings[:8]:
+        console.print(f"[yellow]warning:[/yellow] {warning}")
+
+
+@audit_app.command(name="export")
+def audit_export(
+    suite: str = typer.Option("golden100", help="Eval suite to export for audit."),
+    out: Annotated[
+        Path,
+        typer.Option(help="Output JSONL audit path."),
+    ] = Path("data/audits/golden100.audit.jsonl"),
+) -> None:
+    """Export benchmark labels for human audit."""
+    count = export_audit_suite(suite, out)
+    console.print(f"wrote_audit={out} rows={count}")
+
+
+@audit_app.command(name="import")
+def audit_import(
+    path: Annotated[Path, typer.Argument(help="Reviewed JSONL audit file.")],
+    out: Annotated[
+        Path | None,
+        typer.Option(help="Optional output path for validated audit records."),
+    ] = None,
+) -> None:
+    """Validate and persist human-audited benchmark labels."""
+    count = import_audit_records(path, out=out)
+    console.print(f"imported_audit_rows={count}")
