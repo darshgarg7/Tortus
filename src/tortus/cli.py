@@ -186,6 +186,16 @@ def eval_command(
         Path | None,
         typer.Option(help="Optional imported human-audit JSONL file to apply to labels."),
     ] = None,
+    corpus: str | None = typer.Option(None, help="Corpus name to evaluate."),
+    embedding_provider: str | None = typer.Option(
+        None,
+        help="Override embedding provider: local, openai, or azure.",
+    ),
+    embedding_model: str | None = typer.Option(None, help="Override embedding model name."),
+    data_dir: Annotated[
+        Path | None,
+        typer.Option(help="Override TORTUS_DATA_DIR for this command."),
+    ] = None,
 ) -> None:
     """Run an evaluation suite."""
     try:
@@ -196,8 +206,15 @@ def eval_command(
         selected_strategies = parse_strategies(strategies)
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
+    settings = settings_with_overrides(
+        get_settings(),
+        corpus=corpus,
+        data_dir=data_dir,
+        embedding_provider=embedding_provider,
+        embedding_model=embedding_model,
+    )
     report = run_eval(
-        load_engine(get_settings()),
+        load_engine(settings),
         suite=suite,
         strategies=selected_strategies,
         audit_file=audit_file,

@@ -9,8 +9,8 @@ Tortus currently has a working V2 harness, installable package surface, workspac
 | Corpus | Built-in engineering corpus plus materialized public Kubernetes, OpenTelemetry, W3C, RFC, SRE, and architecture snapshots. | Results can still reflect fixture design until snapshots are larger and independently reviewed. |
 | Extraction | Deterministic term and edge construction. | Avoids noisy extraction failures that a real graph builder must handle. |
 | Embeddings | Local hash fallback plus OpenAI and Azure OpenAI adapters with provider-scoped caches. | Does not measure semantic embedding quality unless an API-backed run is reported with model and cost metadata. |
-| Labels | Curated candidate questions plus human-audit JSONL import/application. | Ground truth can be circular unless a human maintainer actually reviews evidence spans and path labels. |
-| Baselines | Stronger local hybrid graph rerank plus optional GraphRAG, LlamaIndex, and LightRAG command adapters. | Comparisons can be directionally useful but not externally convincing until real external workspaces are configured and reported. |
+| Labels | Curated candidate questions plus JSONL audit import/application. Current checked-in audit rows are `assistant_reviewed`, not human-reviewed. | Ground truth can be circular unless a human maintainer actually reviews evidence spans and path labels. |
+| Baselines | Stronger local hybrid graph rerank plus a real LlamaIndex Core retriever baseline; GraphRAG and LightRAG remain optional command adapters. | Comparisons can be directionally useful but not externally convincing until more real external workspaces are configured and reported. |
 | Scale | Tiny graph and 118-question benchmark. | Confidence intervals are reported, but failure diversity is still limited. |
 
 ## Upgrade Gates
@@ -25,10 +25,10 @@ Tortus currently has a working V2 harness, installable package surface, workspac
    Add schema-constrained LLM concept and edge extraction with deterministic caching. Keep the deterministic extractor as a fixture mode for tests.
 
 4. **Golden-label gate**
-   Manually audit at least 100 questions through `tortus audit export` and `tortus audit import`. Each row should have expected evidence URIs, expected path labels, negative/distractor notes, auditor, reviewed timestamp, and an `audit_status` that reports as `human_reviewed`.
+   Manually audit at least 100 questions through `tortus audit export` and `tortus audit import`. Each row should have expected evidence URIs, expected path labels, negative/distractor notes, auditor, reviewed timestamp, `review_type = "human"`, and an `audit_status` that reports as `human_reviewed`. Assistant-reviewed rows are useful for regression but are not human signoff.
 
 5. **Baseline gate**
-   Run and report configured external baselines, starting with Microsoft GraphRAG, LlamaIndex, and LightRAG. Keep local baselines clearly labeled as `_local` controls.
+   Run and report configured external baselines, starting with the checked-in LlamaIndex Core retriever, then Microsoft GraphRAG and LightRAG command workspaces. Keep local baselines clearly labeled as `_local` controls.
 
 6. **Statistical gate**
    Keep confidence intervals by suite: `single_hop`, `multi_hop`, `boundary_crossing`, and stress/failure slices. Include failure taxonomy, not just wins, and separate audited from unaudited rows.

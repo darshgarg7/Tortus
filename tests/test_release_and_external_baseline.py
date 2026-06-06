@@ -68,3 +68,23 @@ def test_lightrag_external_baseline_skips_without_command(tmp_path) -> None:
     assert run.skipped
     assert run.strategy == "lightrag_external"
     assert "TORTUS_LIGHTRAG_COMMAND" in " ".join(run.warnings)
+
+
+def test_llamaindex_external_baseline_runs_with_core_package(tmp_path) -> None:
+    settings = Settings(
+        TORTUS_DATA_DIR=tmp_path / "data",
+        TORTUS_CACHE_DIR=tmp_path / "cache",
+        TORTUS_CORPUS="engineering",
+    )
+    build_index(settings)
+    run = run_strategy(
+        load_engine(settings),
+        "How did token migration connect authentication and tracing?",
+        "llamaindex_external",
+        TraversalPolicy(),
+    )
+    assert run.external
+    assert not run.skipped
+    assert run.strategy == "llamaindex_external"
+    assert run.evidence
+    assert run.metadata["adapter"] == "llamaindex-core"

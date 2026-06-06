@@ -81,3 +81,27 @@ def test_human_audit_file_overrides_eval_labels(tmp_path) -> None:
     assert audited.expected_terms == ("reviewed-term",)
     assert audited.expected_sources == ("reviewed://source",)
     assert audited.expected_edge_types == ("portal",)
+
+
+def test_assistant_audit_file_is_not_labeled_human_reviewed(tmp_path) -> None:
+    question = questions_for_suite("smoke")[0]
+    audit_record = AuditRecord(
+        id=question.id,
+        suite=question.suite,
+        question=question.question,
+        expected_terms=["assistant-term"],
+        expected_evidence_uris=["assistant://source"],
+        expected_path_labels=["portal"],
+        status="approved",
+        review_type="assistant",
+        auditor="Codex",
+        reviewed_at="2026-06-06T00:00:00Z",
+    )
+    audit_file = tmp_path / "audit.jsonl"
+    audit_file.write_text(audit_record.model_dump_json() + "\n", encoding="utf-8")
+
+    audited = apply_audit_file((question,), audit_file)[0]
+
+    assert audited.audit_status == "assistant_reviewed"
+    assert audited.expected_terms == ("assistant-term",)
+    assert audited.expected_sources == ("assistant://source",)

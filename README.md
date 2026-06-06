@@ -23,8 +23,8 @@ Current evidence strength is prototype-level. The benchmark numbers below are us
 | Corpus | Built-in engineering corpus plus fetchable public Kubernetes, OpenTelemetry, W3C, RFC, SRE, and architecture snapshots. | Better than synthetic-only fixtures; still needs larger audited snapshots before broad claims. | Keep snapshot hashes, dates, licenses, and warnings in reports. |
 | Embeddings | Local hash fallback plus OpenAI and Azure OpenAI embedding adapters with provider-scoped caches. | API embeddings can now be tested without cache contamination from local vectors. | Report model, dimensions, cache hits, cost, and drift per run. |
 | Extraction | Deterministic term and edge extraction. | Makes tests repeatable; does not test noisy LLM concept extraction. | Add schema-constrained LLM extraction, confidence calibration, retry handling, and human spot checks. |
-| Eval labels | Curated labels plus JSONL human-audit import that can override expected evidence URIs and path labels. | Reports can separate human-reviewed rows from pending rows instead of blending them. | Complete maintainer review before treating golden metrics as audited. |
-| Baselines | Local vector, BM25, hybrid, hybrid graph rerank, graph-local, layout, community-summary, bounded-agentic, and optional external command adapters. | Stronger controls; external baselines still need configured workspaces to become real comparisons. | Run GraphRAG, LlamaIndex, and LightRAG adapters on the same snapshots. |
+| Eval labels | Curated labels plus JSONL audit import that can override expected evidence URIs and path labels. Current committed audit rows are assistant-reviewed. | Reports can separate assistant-reviewed, human-reviewed, and pending rows instead of blending them. | Complete maintainer review before treating golden metrics as human-audited. |
+| Baselines | Local vector, BM25, hybrid, hybrid graph rerank, graph-local, layout, community-summary, bounded-agentic, real LlamaIndex Core retriever, and optional external command adapters. | Stronger controls; GraphRAG and LightRAG still need configured workspaces to become real comparisons. | Run GraphRAG and LightRAG adapters on the same snapshots. |
 | Scale | 118 V2 benchmark questions over a 25-node local graph. | Shows mechanics and failure modes; not enough statistical power. | Expand to audited multi-corpus evals with confidence intervals and failure taxonomy by query type. |
 
 ## Installation
@@ -96,6 +96,9 @@ To run the built-in benchmark corpus:
 .venv/bin/tortus query "How did the token migration incident connect authentication and tracing?" --explain
 .venv/bin/tortus golden-set --out data/golden_set.json --count 100
 .venv/bin/tortus eval --suite benchmark --strategies all_with_external \
+  --corpus public-engineering \
+  --data-dir data \
+  --audit-file data/audits/golden100.codex-reviewed.jsonl \
   --json-out data/eval/benchmark.json \
   --duckdb-out data/eval/results.duckdb
 .venv/bin/tortus report \
@@ -140,7 +143,7 @@ TORTUS_LIGHTRAG_COMMAND=""
 
 `TORTUS_VECTOR_BACKEND=faiss` enables the optional FAISS index path when `faiss` is installed. Exact search remains the default because it is deterministic and easy to test.
 
-`TORTUS_GRAPHRAG_COMMAND` enables the optional `graphrag_external` baseline adapter. If the dependency or command is missing, benchmark reports mark that adapter as skipped rather than counting it as a win.
+`llamaindex_external` uses LlamaIndex Core directly when `llama-index-core` is installed. `TORTUS_GRAPHRAG_COMMAND` and `TORTUS_LIGHTRAG_COMMAND` enable the GraphRAG and LightRAG command adapters. If a dependency or command is missing, benchmark reports mark that adapter as skipped rather than counting it as a win.
 
 To use API embeddings:
 
@@ -441,32 +444,33 @@ Current V2 eval strategies:
 - `euclidean_layout_local`
 - `random_layout_local`
 - `graphrag_external` when optional dependency and command configuration are present
-- `llamaindex_external` when `TORTUS_LLAMA_INDEX_COMMAND` is configured
+- `llamaindex_external` when LlamaIndex Core is installed, or when `TORTUS_LLAMA_INDEX_COMMAND` is configured as a fallback
 - `lightrag_external` when `TORTUS_LIGHTRAG_COMMAND` is configured
 
 The older unqualified strategy names remain accepted as CLI aliases and map to the `_local` strategies.
 
-Current V2 benchmark, using `tortus eval --suite benchmark --strategies all_with_external` over 118 questions and 1,652 strategy rows. External adapters are included as skipped rows unless their command configuration is present. A pass requires term recall >= 0.50, source recall >= 0.50, path recall >= 0.50, and faithfulness >= 0.50 for answerable questions. Negative questions pass only when unsupported answers are withheld:
+Current V2 benchmark, using `tortus eval --suite benchmark --strategies all_with_external --corpus public-engineering --data-dir data --audit-file data/audits/golden100.codex-reviewed.jsonl` over 118 questions and 1,652 strategy rows. LlamaIndex Core runs as a real external retriever baseline; GraphRAG and LightRAG are skipped unless their command configuration is present. A pass requires term recall >= 0.50, source recall >= 0.50, path recall >= 0.50, and faithfulness >= 0.50 for answerable questions. Negative questions pass only when unsupported answers are withheld:
 
 | Strategy | Pass | Source | Path | Precision | Faith | p95 ms | Portals | Fanout |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `tortus_torus` | 0.02 | 0.02 | 0.67 | 0.22 | 0.88 | 8.5 | 0.8 | 4.5 |
-| `hybrid_graph_rerank_local` | 0.00 | 0.00 | 1.00 | 0.52 | 0.92 | 10.7 | 14.3 | 8.9 |
-| `bounded_agentic_local` | 0.00 | 0.00 | 1.00 | 0.37 | 0.84 | 7.9 | 2.9 | 5.8 |
-| `graph_local` | 0.02 | 0.02 | 0.17 | 0.14 | 0.87 | 6.3 | 0.0 | 4.5 |
-| `hybrid_dense_bm25_local` | 0.00 | 0.00 | 0.03 | 0.03 | 0.93 | 5.9 | 0.0 | 3.6 |
-| `bm25_local` | 0.00 | 0.00 | 0.03 | 0.03 | 0.92 | 4.2 | 0.0 | 3.8 |
-| `community_summary_local` | 0.00 | 0.00 | 0.03 | 0.03 | 0.92 | 4.3 | 0.0 | 4.1 |
-| `vector_only_local` | 0.00 | 0.00 | 0.03 | 0.03 | 0.83 | 1.8 | 0.0 | 2.9 |
-| `torus_layout_local` | 0.00 | 0.00 | 0.03 | 0.03 | 0.71 | 2.8 | 0.0 | 1.4 |
-| `euclidean_layout_local` | 0.00 | 0.00 | 0.03 | 0.03 | 0.71 | 2.8 | 0.0 | 1.4 |
-| `random_layout_local` | 0.00 | 0.00 | 0.03 | 0.03 | 0.66 | 2.8 | 0.0 | 3.5 |
+| `tortus_torus` | 0.80 | 0.73 | 1.00 | 0.64 | 0.88 | 3.4 | 3.5 | 5.2 |
+| `hybrid_graph_rerank_local` | 0.80 | 0.74 | 1.00 | 0.82 | 0.88 | 5.7 | 27.9 | 8.8 |
+| `bounded_agentic_local` | 0.73 | 0.67 | 0.95 | 0.86 | 0.89 | 3.0 | 3.0 | 4.4 |
+| `graph_local` | 0.14 | 0.58 | 0.17 | 0.34 | 0.88 | 2.2 | 0.0 | 4.3 |
+| `llamaindex_external` | 0.01 | 0.72 | 0.03 | 0.03 | 0.88 | 7.5 | 0.0 | 4.3 |
+| `hybrid_dense_bm25_local` | 0.01 | 0.73 | 0.03 | 0.03 | 0.88 | 1.5 | 0.0 | 4.4 |
+| `vector_only_local` | 0.01 | 0.71 | 0.03 | 0.03 | 0.88 | 0.8 | 0.0 | 4.3 |
+| `bm25_local` | 0.02 | 0.65 | 0.03 | 0.03 | 0.88 | 1.0 | 0.0 | 4.2 |
+| `community_summary_local` | 0.02 | 0.52 | 0.03 | 0.03 | 0.88 | 1.0 | 0.0 | 4.1 |
+| `torus_layout_local` | 0.01 | 0.58 | 0.03 | 0.03 | 0.88 | 1.0 | 0.0 | 3.1 |
+| `euclidean_layout_local` | 0.01 | 0.52 | 0.03 | 0.03 | 0.89 | 0.8 | 0.0 | 3.1 |
+| `random_layout_local` | 0.01 | 0.32 | 0.03 | 0.03 | 0.89 | 0.8 | 0.0 | 4.3 |
 
-The current signal is narrower and more useful than a broad superiority claim: Tortus keeps better path recall than most local stand-ins, while the new `hybrid_graph_rerank_local` baseline reaches path recall 1.00 and path precision 0.52. Neither clears the V2 acceptance targets yet because source recall and final pass rate are still weak, and the graph-rerank baseline is too noisy with portal hops and fanout. The report therefore treats this as an honest failure-and-learning snapshot, not proof that toroidal retrieval beats production systems.
+The current signal is useful but still not a broad superiority claim: Tortus and the stronger graph reranker both reach 0.80 pass rate and full path recall on the assistant-reviewed benchmark, while LlamaIndex Core provides a real external vector-retrieval comparison with strong source recall but weak path recall because it does not model hops. Tortus is more selective than `hybrid_graph_rerank_local` on portal hops and fanout, but it still needs better source selection and a real GraphRAG/LightRAG run before external validity claims are fair.
 
-The external baseline adapters were requested in the latest benchmark run, but all 354 external rows were skipped because no GraphRAG, LlamaIndex, or LightRAG command template was configured. The report records those skipped reasons instead of counting them as wins.
+GraphRAG and LightRAG were requested in the latest benchmark run, but their 236 external rows were skipped because no command template was configured. The report records those skipped reasons instead of counting them as wins.
 
-The `data/golden_set.json` file is a deterministic 100-question curated golden set with expected evidence URIs and hop targets. Its `audit_status` is intentionally `curated_pending_human_signoff`; it is ready for maintainer review, not presented as a completed externally reviewed benchmark.
+The `data/golden_set.json` file is a deterministic 100-question curated golden set with expected evidence URIs and hop targets. `data/audits/golden100.codex-reviewed.jsonl` is an assistant-reviewed label audit used for current regression runs. It is not human signoff.
 
 Human-audited labels are applied through JSONL, not by mutating generated rows in place:
 
@@ -477,11 +481,11 @@ tortus audit import data/audits/golden100.audit.jsonl --out data/audits/golden10
 tortus eval --suite benchmark --audit-file data/audits/golden100.reviewed.jsonl
 ```
 
-Rows only report `human_reviewed` when a review file includes approved/reviewed status, auditor, and reviewed timestamp.
+Rows only report `human_reviewed` when a review file includes approved/reviewed status, auditor, reviewed timestamp, and a human review type. Codex-reviewed rows are reported separately as `assistant_reviewed`.
 
 Remaining work for a publishable external result:
 
-- run configured external GraphRAG, LlamaIndex, and LightRAG workspaces on the same materialized snapshots
+- run configured external GraphRAG and LightRAG workspaces on the same materialized snapshots
 - scale beyond the current public-source manifest to larger commit-pinned public engineering snapshots
 - have a human maintainer audit and sign off the 100-question curated golden set
 - profile real API-backed embedding and synthesis cost

@@ -23,6 +23,7 @@ class AuditRecord(BaseModel):
     expected_path_labels: list[str] = Field(default_factory=list)
     expect_answer: bool = True
     status: str = "pending"
+    review_type: str = "human"
     auditor: str = ""
     reviewed_at: str = ""
     notes: str = ""

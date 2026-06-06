@@ -9,9 +9,11 @@ import time
 from collections import Counter
 from hashlib import sha1
 from importlib import metadata, util
+from typing import Any, cast
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
+from .embeddings import EmbeddingProvider
 from .graph_store import GraphStore
 from .models import (
     ConceptNode,
@@ -113,6 +115,8 @@ def run_strategy(
         return run_layout_probe(engine, query, distance="euclidean", top_k=top_k, strategy=strategy)
     if strategy == "random_layout_local":
         return run_layout_probe(engine, query, distance="random", top_k=top_k, strategy=strategy)
+    if strategy == "llamaindex_external":
+        return run_llamaindex_external(engine, query, policy=policy, top_k=top_k)
     if strategy in EXTERNAL_STRATEGIES:
         return run_external_command_baseline(strategy, query, policy=policy)
     raise ValueError(f"unknown strategy: {strategy}")
@@ -530,6 +534,159 @@ EXTERNAL_COMMANDS = {
     "llamaindex_external": ("llamaindex", "TORTUS_LLAMA_INDEX_COMMAND", "llama_index"),
     "lightrag_external": ("lightrag", "TORTUS_LIGHTRAG_COMMAND", "lightrag"),
 }
+
+
+def run_llamaindex_external(
+    engine: QueryEngine,
+    query: str,
+    policy: TraversalPolicy,
+    top_k: int = 5,
+) -> StrategyRun:
+    """Run a real LlamaIndex Core retriever baseline over Tortus evidence spans."""
+    started = time.perf_counter()
+    metadata_payload = {
+        "adapter": "llamaindex-core",
+        "embedding_provider": type(engine.embeddings).__name__,
+    }
+    try:
+        if util.find_spec("llama_index.core") is None:
+            return run_external_command_baseline(
+                "llamaindex_external",
+                query,
+                policy=policy,
+            )
+        metadata_payload["dependency_version"] = metadata.version("llama-index-core")
+        from llama_index.core import VectorStoreIndex
+        from llama_index.core.embeddings import BaseEmbedding
+        from llama_index.core.schema import TextNode
+        from llama_index.core.settings import Settings as LlamaSettings
+    except Exception as exc:
+        command_template = os.environ.get("TORTUS_LLAMA_INDEX_COMMAND", "")
+        if command_template:
+            return run_external_command_baseline(
+                "llamaindex_external",
+                query,
+                policy=policy,
+            )
+        return skipped_external_result(
+            "llamaindex_external",
+            query,
+            started,
+            f"llamaindex external baseline skipped: {exc}",
+            metadata_payload,
+        )
+
+    class TortusLlamaIndexEmbedding(BaseEmbedding):
+        """LlamaIndex embedding wrapper backed by the configured Tortus provider."""
+
+        _provider: EmbeddingProvider = PrivateAttr()
+
+        def __init__(self, provider: EmbeddingProvider) -> None:
+            super().__init__(model_name=type(provider).__name__)
+            self._provider = provider
+
+        def _get_text_embedding(self, text: str) -> list[float]:
+            return cast(list[float], self._provider.embed([text])[0].astype(float).tolist())
+
+        def _get_query_embedding(self, query: str) -> list[float]:
+            return cast(list[float], self._provider.embed([query])[0].astype(float).tolist())
+
+        async def _aget_query_embedding(self, query: str) -> list[float]:
+            return self._get_query_embedding(query)
+
+    nodes: list[Any] = []
+    for node in engine.graph.list_nodes():
+        for evidence_index, span in enumerate(node.evidence):
+            text = span.text.strip() or node.text
+            if not text:
+                continue
+            nodes.append(
+                TextNode(
+                    text=f"{node.label}\n{text}",
+                    id_=f"{node.id}:evidence:{evidence_index}",
+                    metadata={
+                        "node_id": node.id,
+                        "label": node.label,
+                        "uri": span.uri,
+                        "start": span.start,
+                        "end": span.end,
+                        "text": span.text,
+                    },
+                )
+            )
+    if not nodes:
+        return skipped_external_result(
+            "llamaindex_external",
+            query,
+            started,
+            "llamaindex external baseline skipped: no evidence spans were available.",
+            metadata_payload,
+        )
+
+    embed_model = TortusLlamaIndexEmbedding(engine.embeddings)
+    LlamaSettings.llm = None
+    LlamaSettings.embed_model = embed_model
+    index = VectorStoreIndex(nodes, embed_model=embed_model)
+    retrieved = index.as_retriever(similarity_top_k=top_k).retrieve(query)
+    evidence: list[EvidenceSpan] = []
+    hits: list[SearchHit] = []
+    for item in retrieved:
+        item_node = item.node
+        item_metadata = item_node.metadata
+        span = EvidenceSpan(
+            uri=str(item_metadata.get("uri", "")),
+            start=int(item_metadata.get("start", 0)),
+            end=int(item_metadata.get("end", 0)),
+            text=str(item_metadata.get("text", getattr(item_node, "text", ""))),
+        )
+        evidence.append(span)
+        hits.append(
+            SearchHit(
+                node_id=str(item_metadata.get("node_id", item_node.node_id)),
+                label=str(item_metadata.get("label", item_node.node_id)),
+                score=float(item.score or 0.0),
+                evidence=[span],
+            )
+        )
+    deduped = dedupe_evidence(evidence)
+    return StrategyRun(
+        strategy="llamaindex_external",
+        hits=hits,
+        evidence=deduped,
+        answer=synthesize_evidence_answer(query, hits, deduped).answer,
+        latency_ms=(time.perf_counter() - started) * 1000,
+        nodes_visited=len(retrieved),
+        hops_taken=0,
+        shard_fanout=shard_fanout_for_hits(engine.graph, hits),
+        tokens_estimated=estimate_tokens(query, deduped),
+        warnings=[] if deduped else ["LlamaIndex retriever returned no evidence."],
+        external=True,
+        skipped=False,
+        metadata=metadata_payload,
+    )
+
+
+def skipped_external_result(
+    strategy: str,
+    query: str,
+    started: float,
+    warning: str,
+    metadata_payload: dict[str, str],
+) -> StrategyRun:
+    """Return a consistent skipped external baseline payload."""
+    return StrategyRun(
+        strategy=strategy,
+        answer="",
+        latency_ms=(time.perf_counter() - started) * 1000,
+        nodes_visited=0,
+        hops_taken=0,
+        shard_fanout=0,
+        tokens_estimated=estimate_tokens(query, []),
+        warnings=[warning],
+        external=True,
+        skipped=True,
+        metadata=metadata_payload,
+    )
 
 
 def run_external_command_baseline(

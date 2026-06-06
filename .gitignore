@@ -18,6 +18,8 @@ data/*
 !data/golden_set.json
 !data/benchmark_snapshots/
 !data/benchmark_snapshots/*.json
+!data/audits/
+!data/audits/*.jsonl
 !data/reports/
 !data/reports/eval-report.md
 .tortus_cache/
