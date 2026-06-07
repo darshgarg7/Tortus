@@ -20,7 +20,7 @@ Current evidence strength is prototype-level. The benchmark numbers below are us
 
 | Layer | Current state | Evidence implication | Hardening move |
 | --- | --- | --- | --- |
-| Corpus | Built-in engineering corpus plus fetchable public Kubernetes, OpenTelemetry, W3C, RFC, SRE, and architecture snapshots. | Better than synthetic-only fixtures; still needs larger audited snapshots before broad claims. | Keep snapshot hashes, dates, licenses, and warnings in reports. |
+| Corpus | Built-in engineering corpus, packaged Acme Payments demo corpus, plus fetchable public Kubernetes, OpenTelemetry, W3C, RFC, SRE, and architecture snapshots. | Better than synthetic-only fixtures; still needs larger audited snapshots before broad claims. | Keep snapshot hashes, dates, licenses, and warnings in reports. |
 | Embeddings | Local hash fallback plus OpenAI and Azure OpenAI embedding adapters with provider-scoped caches. | API embeddings can now be tested without cache contamination from local vectors. | Report model, dimensions, cache hits, cost, and drift per run. |
 | Extraction | Deterministic term and edge extraction. | Makes tests repeatable; does not test noisy LLM concept extraction. | Add schema-constrained LLM extraction, confidence calibration, retry handling, and human spot checks. |
 | Eval labels | Curated labels plus JSONL audit import that can override expected evidence URIs and path labels. Current committed audit rows are assistant-reviewed. | Reports can separate assistant-reviewed, human-reviewed, and pending rows instead of blending them. | Complete maintainer review before treating golden metrics as human-audited. |
@@ -62,19 +62,30 @@ tortus doctor
 
 ## Quickstart
 
-### Fast Demo
+### Fast Demo From Any Directory
 
-Use the built-in public engineering corpus if you want to see Tortus work immediately:
+Use the packaged Acme Payments demo corpus if you want to see Tortus work immediately after installation. This does not require cloning the repository or downloading example files:
 
 ```bash
-tortus ingest --corpus public-engineering
-tortus index --corpus public-engineering
-tortus query "How did token migration connect authentication and tracing?" \
-  --corpus public-engineering \
+tortus ingest --corpus acme-payments-demo --data-dir .tortus/acme-demo
+tortus index --corpus acme-payments-demo --data-dir .tortus/acme-demo
+tortus query "What should Acme fix to stop EU refund trace fragmentation?" \
+  --corpus acme-payments-demo \
+  --data-dir .tortus/acme-demo \
   --explain
 ```
 
 You should see a terminal answer panel, confidence score, retrieval snapshot, evidence spans, and a reasoning-path table.
+
+Open the same demo in the dashboard:
+
+```bash
+TORTUS_DATA_DIR=.tortus/acme-demo TORTUS_CORPUS=acme-payments-demo tortus serve --port 8010
+```
+
+Then visit `http://127.0.0.1:8010`.
+
+The demo question requires Tortus to connect an incident note, a token migration design note, a gateway retry runbook, and an observability note. A simple retriever can find relevant chunks; Tortus is meant to expose the path between them.
 
 ### Run On Your Own Docs
 

@@ -323,6 +323,90 @@ PUBLIC_ENGINEERING_CORPUS: tuple[Document, ...] = (
     ),
 )
 
+ACME_PAYMENTS_DEMO_CORPUS: tuple[Document, ...] = (
+    Document(
+        id="doc:acme-incident-eu-refund-tracing",
+        title="Incident: EU Refund Trace Breakage",
+        source="demo://acme-payments/incident-eu-refund-tracing",
+        domain="payments-incident",
+        metadata={"demo": "acme-payments"},
+        text=(
+            "On 2026-05-18, the EU refund workflow showed fragmented traces after the "
+            "service account token migration. The refund API still completed most requests, "
+            "but support could not follow a payment from refund-api to ledger-writer because "
+            "the gateway retry path created a new trace segment. The incident appeared after "
+            "the authentication team moved refund workers from long-lived service account "
+            "secrets to projected short-lived tokens. The new tokens required the payments-api "
+            "audience. When the gateway retried a request after an audience validation failure, "
+            "it preserved the request body but dropped the traceparent header. Primary symptoms "
+            "were trace continuity breaking only on retry, audience validation warnings "
+            "increasing for EU refund workers, ledger writes succeeding after retry, and "
+            "observability showing two unrelated traces. The mitigation was to align the refund "
+            "worker audience with payments-api and preserve trace context across gateway retries."
+        ),
+    ),
+    Document(
+        id="doc:acme-auth-token-migration",
+        title="Design Note: Service Account Token Migration",
+        source="demo://acme-payments/auth-token-migration",
+        domain="payments-auth",
+        metadata={"demo": "acme-payments"},
+        text=(
+            "Refund workers are migrating from long-lived service account secrets to projected "
+            "short-lived service account tokens. The new token model reduces secret exposure "
+            "and allows the platform team to rotate credentials without redeploying every "
+            "worker. The migration changes authentication behavior because each worker must "
+            "request a token with the correct audience. For the payments stack, refund workers "
+            "should use the payments-api audience before calling the gateway. If a worker "
+            "presents a token with the legacy internal-api audience, the gateway can reject the "
+            "first call and trigger a retry. The retry is expected to be safe only if request "
+            "metadata, including trace context, is preserved. The rollout requires refund "
+            "workers to request the payments-api audience, alerting on audience validation "
+            "warnings, and coordination with observability because retry behavior can hide the "
+            "original authentication failure."
+        ),
+    ),
+    Document(
+        id="doc:acme-gateway-retry-runbook",
+        title="Runbook: Gateway Retry Context Preservation",
+        source="demo://acme-payments/gateway-retry-runbook",
+        domain="payments-gateway",
+        metadata={"demo": "acme-payments"},
+        text=(
+            "The gateway retries idempotent payment requests when the first attempt fails with "
+            "a transient authentication or upstream error. A retry must preserve request "
+            "metadata so downstream services can correlate the second attempt with the original "
+            "request. Required metadata on retry includes traceparent, tracestate, x-request-id, "
+            "authenticated service account identity, and token audience used for the failed "
+            "attempt. If traceparent is dropped during retry, observability will show a new "
+            "trace even though the user operation is the same. If the retry follows an audience "
+            "validation failure, responders should inspect both authentication logs and trace "
+            "propagation logs. For refund incidents, the fastest check is to compare gateway "
+            "retry logs with audience validation warnings from the refund worker."
+        ),
+    ),
+    Document(
+        id="doc:acme-observability-trace-context",
+        title="Observability Note: Trace Context Propagation",
+        source="demo://acme-payments/observability-trace-context",
+        domain="payments-observability",
+        metadata={"demo": "acme-payments"},
+        text=(
+            "The payments platform uses W3C trace context. Services must forward traceparent "
+            "and tracestate across synchronous calls, retries, and queue handoffs. Trace "
+            "continuity is especially important for incident response. If a gateway retry "
+            "creates a fresh trace, the dashboard may show two healthy partial traces instead "
+            "of one failing end-to-end operation. When trace continuity breaks after an "
+            "authentication rollout, responders should verify whether token audience validation "
+            "failed before the retry, whether the gateway preserved traceparent, whether "
+            "downstream services received the same trace ID after retry, and whether the "
+            "affected region adopted the token migration earlier than other regions. Missing "
+            "retry trace context hides the causal path through authentication, gateway behavior, "
+            "and downstream ledger writes."
+        ),
+    ),
+)
+
 
 def load_builtin_corpus(name: str = "engineering") -> list[Document]:
     """Load a built-in corpus by name."""
@@ -330,6 +414,8 @@ def load_builtin_corpus(name: str = "engineering") -> list[Document]:
         return list(ENGINEERING_CORPUS)
     if name == "public":
         return list(PUBLIC_ENGINEERING_CORPUS)
+    if name in {"acme-payments-demo", "demo-acme-payments", "demo"}:
+        return list(ACME_PAYMENTS_DEMO_CORPUS)
     if name in {"public-engineering", "engineering-public", "all"}:
         return list(ENGINEERING_CORPUS + PUBLIC_ENGINEERING_CORPUS)
     if name != "engineering":
