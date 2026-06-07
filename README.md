@@ -29,40 +29,105 @@ Current evidence strength is prototype-level. The benchmark numbers below are us
 
 ## Installation
 
-Tortus is available on PyPI. Install it using `pip`:
+Tortus installs as the `tortus-rag` distribution and exposes the `tortus` command.
 
 ```bash
 pip install tortus-rag
 ```
 
-For advanced ingestion (PDF, HTML, URL extraction), install the optional dependencies:
+For PDF, HTML, and URL ingestion, install the ingestion extra:
+
 ```bash
 pip install "tortus-rag[ingest]"
 ```
 
+For benchmark baselines, install the baseline extra:
+
+```bash
+pip install "tortus-rag[baselines]"
+```
+
+From a cloned repo, use the project virtualenv command form shown below:
+
+```bash
+.venv/bin/tortus --help
+```
+
+After installation, run:
+
+```bash
+tortus doctor
+```
+
+`doctor` checks the installed package, dashboard assets, optional dependencies, and active data path.
+
 ## Quickstart
 
-### CLI Usage
+### Fast Demo
+
+Use the built-in public engineering corpus if you want to see Tortus work immediately:
+
+```bash
+tortus ingest --corpus public-engineering
+tortus index --corpus public-engineering
+tortus query "How did token migration connect authentication and tracing?" \
+  --corpus public-engineering \
+  --explain
+```
+
+You should see a terminal answer panel, confidence score, retrieval snapshot, evidence spans, and a reasoning-path table.
+
+### Run On Your Own Docs
 
 Tortus is designed to run locally against your own documentation.
 
 ```bash
-# 1. Initialize a local Tortus project
 tortus init
-
-# 2. Ingest your documents, Markdown files, or URLs
-tortus ingest README.md ./docs https://example.com
-
-# 3. Build the graph and vector index
+tortus ingest ./docs README.md
 tortus index
-
-# 4. Ask a question and trace the reasoning path
-tortus query "What does Tortus say about evidence-backed retrieval?" --explain
-
-# 5. Open the visual graph and query dashboard
-tortus serve --port 8010
-# Dashboard running at http://localhost:8010
+tortus query "Which docs explain the rollout risk?" --explain
 ```
+
+What each step does:
+
+| Step | Command | Result |
+| --- | --- | --- |
+| Create a workspace | `tortus init` | Writes `tortus.toml` and creates `.tortus/`. |
+| Snapshot sources | `tortus ingest ./docs README.md` | Stores normalized documents and chunks. |
+| Build retrieval graph | `tortus index` | Builds nodes, edges, embeddings, and vector index. |
+| Ask a question | `tortus query "..." --explain` | Returns answer, evidence, confidence, and hops. |
+
+Supported local file types are `.md`, `.mdx`, `.txt`, `.html`, `.htm`, and `.pdf`. URLs are supported when the `ingest` extra is installed:
+
+```bash
+tortus ingest ./docs https://example.com/post --refresh
+```
+
+### Open The Dashboard
+
+After `ingest` and `index`, start the diagnostic workbench:
+
+```bash
+tortus serve --port 8010
+```
+
+Then open `http://127.0.0.1:8010`. The dashboard shows the answer, evidence spans, selected hops, pruned candidates, portal usage, confidence, and unsupported claims.
+
+### Run From This Repo
+
+If you are working from the cloned repository instead of an installed package, prefix commands with `.venv/bin/`:
+
+```bash
+.venv/bin/tortus doctor
+.venv/bin/tortus ingest --corpus public-engineering --data-dir data
+.venv/bin/tortus index --corpus public-engineering --data-dir data
+.venv/bin/tortus query "How do service accounts connect to tracing?" \
+  --corpus public-engineering \
+  --data-dir data \
+  --explain
+```
+
+Use `--data-dir data` for repo benchmark commands because a local `tortus.toml` may point normal workspace commands at `.tortus/data`.
 
 ### Python API Usage
 
@@ -88,12 +153,13 @@ for hop in result.reasoning_path:
     print(f"{hop.from_node} --[{hop.edge_type}]--> {hop.to_node}")
 ```
 
-To run the built-in benchmark corpus:
+### Run The Benchmark
+
+The benchmark is for development evidence, not the normal user path:
 
 ```bash
-.venv/bin/tortus ingest --corpus public-engineering
-.venv/bin/tortus index --layout torus --corpus public-engineering
-.venv/bin/tortus query "How did the token migration incident connect authentication and tracing?" --explain
+.venv/bin/tortus ingest --corpus public-engineering --data-dir data
+.venv/bin/tortus index --layout torus --corpus public-engineering --data-dir data
 .venv/bin/tortus golden-set --out data/golden_set.json --count 100
 .venv/bin/tortus eval --suite benchmark --strategies all_with_external \
   --corpus public-engineering \
@@ -107,23 +173,20 @@ To run the built-in benchmark corpus:
 .venv/bin/tortus serve --port 8010
 ```
 
-Or run the full local demo path:
+The eval command prints a compact strategy summary by default. Add `--rows` if you want every per-question row:
 
 ```bash
-scripts/demo.sh
+.venv/bin/tortus eval --suite smoke --strategies tortus_torus,vector_only_local --rows
 ```
 
-Run checks:
+### Developer Checks
+
+Use these before opening a PR or publishing a package:
 
 ```bash
 .venv/bin/ruff check .
 .venv/bin/mypy src/tortus scripts/run_pytest.py
 .venv/bin/python scripts/run_pytest.py
-```
-
-Release checks:
-
-```bash
 .venv/bin/python -m build
 .venv/bin/twine check dist/*
 .venv/bin/tortus release-check
@@ -164,17 +227,14 @@ tortus index --corpus external-engineering
 
 The fetch writes raw responses, normalized text, headers, SHA256 hashes, retrieval timestamps, license notes, and extraction warnings under the configured cache and data directories.
 
-## User Document Ingestion
+## User Document Ingestion Details
 
-Tortus can now run against a local workspace instead of only built-in fixtures:
+The Quickstart above shows the normal workspace flow. A few useful ingestion variants:
 
 ```bash
-tortus init
 tortus ingest ./docs
 tortus ingest README.md ./docs https://example.com
 tortus ingest --manifest sources.toml
-tortus index
-tortus query "Which docs explain the rollout risk?"
 ```
 
 Supported local file types are `.md`, `.mdx`, `.txt`, `.html`, `.htm`, and `.pdf`. URL ingestion stores a pinned raw snapshot, normalized text, metadata, SHA256, retrieval timestamp, content type, ETag, Last-Modified, and extraction warnings. HTML extraction uses `trafilatura` with BeautifulSoup fallback; PDF extraction uses `pypdf` and keeps empty/scanned PDFs as warned documents instead of pretending they worked.
