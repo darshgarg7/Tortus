@@ -94,6 +94,7 @@ include = [
   "data/benchmark_snapshots/*.json",
   "data/reports/eval-report.md",
   "docs/**",
+  "examples/**",
   "scripts/**"
 ]
 

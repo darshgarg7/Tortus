@@ -139,7 +139,12 @@ def ingest_one_source(source: str, *, raw_dir: Path, refresh: bool) -> list[Inge
         if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
             return []
         return [ingest_local_file(path, raw_dir=raw_dir)]
-    raise ValueError(f"source does not exist or is not supported: {source}")
+    raise ValueError(
+        "source does not exist or is not supported: "
+        f"{source}. Current directory: {Path.cwd()}. "
+        "Pass an absolute path, cd into the project containing the source, or use a "
+        "built-in corpus such as --corpus acme-payments-demo."
+    )
 
 
 def iter_supported_files(root: Path) -> Iterable[Path]:
