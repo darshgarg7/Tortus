@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from tortus.config import Settings
-from tortus.eval import run_eval
+from tortus.eval import count_source_matches, run_eval, source_uri_matches
 from tortus.pipeline import build_index, load_engine
 from tortus.report import strategy_summaries
 
@@ -38,3 +38,20 @@ def test_smoke_benchmark_stays_within_snapshot_thresholds(tmp_path) -> None:
             assert summary.mean_shard_fanout <= thresholds["max_mean_shard_fanout"]
         if "max_mean_portal_hops" in thresholds:
             assert summary.mean_portal_hops <= thresholds["max_mean_portal_hops"]
+
+
+def test_source_matching_handles_fragments_and_public_fixture_equivalents() -> None:
+    assert source_uri_matches(
+        "builtin://opentelemetry/context-propagation",
+        "public://w3c/trace-context@tortus-v1#chunk:0",
+    )
+    assert count_source_matches(
+        (
+            "builtin://kubernetes/kep-service-account-tokens",
+            "builtin://synthetic/incident-token-observability",
+        ),
+        {
+            "public://kubernetes/docs/service-accounts-admin@tortus-v1",
+            "builtin://synthetic/incident-token-observability#span:0",
+        },
+    ) == 2

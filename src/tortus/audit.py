@@ -17,13 +17,27 @@ class AuditRecord(BaseModel):
     suite: str
     question: str
     expected_terms: list[str]
-    expected_sources: list[str]
+    expected_sources: list[str] = Field(default_factory=list)
+    expected_evidence_uris: list[str] = Field(default_factory=list)
     expected_edge_types: list[str] = Field(default_factory=list)
+    expected_path_labels: list[str] = Field(default_factory=list)
     expect_answer: bool = True
     status: str = "pending"
+    review_type: str = "human"
     auditor: str = ""
     reviewed_at: str = ""
     notes: str = ""
+
+    def model_post_init(self, __context: object) -> None:
+        """Keep old and reviewer-friendly audit label fields in sync."""
+        if not self.expected_sources and self.expected_evidence_uris:
+            self.expected_sources = list(self.expected_evidence_uris)
+        if not self.expected_evidence_uris and self.expected_sources:
+            self.expected_evidence_uris = list(self.expected_sources)
+        if not self.expected_edge_types and self.expected_path_labels:
+            self.expected_edge_types = list(self.expected_path_labels)
+        if not self.expected_path_labels and self.expected_edge_types:
+            self.expected_path_labels = list(self.expected_edge_types)
 
 
 def export_audit_suite(suite: str, out: Path) -> int:
@@ -72,7 +86,9 @@ def record_from_question(question: EvalQuestion) -> AuditRecord:
         question=question.question,
         expected_terms=list(question.expected_terms),
         expected_sources=list(question.expected_sources),
+        expected_evidence_uris=list(question.expected_sources),
         expected_edge_types=list(question.expected_edge_types),
+        expected_path_labels=list(question.expected_edge_types),
         expect_answer=question.expect_answer,
         status="pending",
     )

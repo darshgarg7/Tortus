@@ -191,10 +191,13 @@ def generate_markdown_report(report: EvalReport) -> str:
         "## Reproduction",
         "",
         "```bash",
-        "tortus ingest --corpus public-engineering",
-        "tortus index --layout torus --corpus public-engineering",
+        "tortus ingest --corpus public-engineering --data-dir data",
+        "tortus index --layout torus --corpus public-engineering --data-dir data",
         "tortus golden-set --out data/golden_set.json --count 100",
-        "tortus eval --suite benchmark --strategies all \\",
+        f"tortus eval --suite benchmark --strategies {reproduction_strategy_arg(report)} \\",
+        "  --corpus public-engineering \\",
+        "  --data-dir data \\",
+        *reproduction_audit_args(report),
         "  --json-out data/eval/benchmark.json \\",
         "  --duckdb-out data/eval/results.duckdb",
         "tortus report --eval-json data/eval/benchmark.json --out data/reports/eval-report.md",
@@ -202,6 +205,19 @@ def generate_markdown_report(report: EvalReport) -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+def reproduction_strategy_arg(report: EvalReport) -> str:
+    """Return the strategy selector that matches the report rows."""
+    return "all_with_external" if any(row.external for row in report.rows) else "all"
+
+
+def reproduction_audit_args(report: EvalReport) -> list[str]:
+    """Return audit flags when a report used the committed assistant audit file."""
+    statuses = {row.audit_status for row in report.rows}
+    if "assistant_reviewed" in statuses:
+        return ["  --audit-file data/audits/golden100.codex-reviewed.jsonl \\"]
+    return []
 
 
 def classify_row(row: EvalRow) -> list[str]:

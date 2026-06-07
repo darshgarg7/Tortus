@@ -20,64 +20,128 @@ Current evidence strength is prototype-level. The benchmark numbers below are us
 
 | Layer | Current state | Evidence implication | Hardening move |
 | --- | --- | --- | --- |
-| Corpus | Built-in engineering corpus plus source-backed public engineering summaries. | Good for deterministic system tests; still too small and summary-based for external validity. | Add larger commit-pinned public Kubernetes, OpenTelemetry, and architecture/RFC snapshots with manifests. |
-| Embeddings | Local hash embedding fallback, with API-backed embedding adapter available. | Validates interfaces and reproducibility; does not prove semantic embedding quality. | Run cached `text-embedding-3-large` or equivalent embeddings and report cost, cache hits, and drift. |
+| Corpus | Built-in engineering corpus plus fetchable public Kubernetes, OpenTelemetry, W3C, RFC, SRE, and architecture snapshots. | Better than synthetic-only fixtures; still needs larger audited snapshots before broad claims. | Keep snapshot hashes, dates, licenses, and warnings in reports. |
+| Embeddings | Local hash fallback plus OpenAI and Azure OpenAI embedding adapters with provider-scoped caches. | API embeddings can now be tested without cache contamination from local vectors. | Report model, dimensions, cache hits, cost, and drift per run. |
 | Extraction | Deterministic term and edge extraction. | Makes tests repeatable; does not test noisy LLM concept extraction. | Add schema-constrained LLM extraction, confidence calibration, retry handling, and human spot checks. |
-| Eval labels | 100-question curated set generated from known source patterns, with pending-human-signoff status. | Useful pressure test; not a completed human-reviewed golden set. | Have a human maintainer audit expected evidence URIs, path labels, and negative cases before treating metrics as benchmark results. |
-| Baselines | Local vector, BM25, hybrid, graph-local, layout, community-summary, and bounded-agentic approximations. | Good sanity checks; not a final comparison to external systems. | Add serious GraphRAG/RAPTOR/HippoRAG/LightRAG-style implementations or clearly scoped reproductions. |
+| Eval labels | Curated labels plus JSONL audit import that can override expected evidence URIs and path labels. Current committed audit rows are assistant-reviewed. | Reports can separate assistant-reviewed, human-reviewed, and pending rows instead of blending them. | Complete maintainer review before treating golden metrics as human-audited. |
+| Baselines | Local vector, BM25, hybrid, hybrid graph rerank, graph-local, layout, community-summary, bounded-agentic, real LlamaIndex Core retriever, and optional external command adapters. | Stronger controls; GraphRAG and LightRAG still need configured workspaces to become real comparisons. | Run GraphRAG and LightRAG adapters on the same snapshots. |
 | Scale | 118 V2 benchmark questions over a 25-node local graph. | Shows mechanics and failure modes; not enough statistical power. | Expand to audited multi-corpus evals with confidence intervals and failure taxonomy by query type. |
 
 ## Installation
 
-Tortus is available on PyPI. Install it using `pip`:
+Tortus installs as the `tortus-rag` distribution and exposes the `tortus` command.
 
 ```bash
 pip install tortus-rag
 ```
 
-For advanced ingestion (PDF, HTML, URL extraction), install the optional dependencies:
+For PDF, HTML, and URL ingestion, install the ingestion extra:
 ```bash
 pip install "tortus-rag[ingest]"
 ```
 
+For benchmark baselines, install the baseline extra:
+
+```bash
+pip install "tortus-rag[baselines]"
+```
+
+From a cloned repo, use the project virtualenv command form shown below:
+
+```bash
+.venv/bin/tortus --help
+```
+
+After installation, run:
+
+```bash
+tortus doctor
+```
+
+`doctor` checks the installed package, dashboard assets, optional dependencies, and active data path.
 
 ## Quickstart
 
-### CLI Usage
+### Fast Demo
+
+Use the built-in public engineering corpus if you want to see Tortus work immediately:
+
+```bash
+tortus ingest --corpus public-engineering
+tortus index --corpus public-engineering
+tortus query "How did token migration connect authentication and tracing?" \
+  --corpus public-engineering \
+  --explain
+```
+
+You should see a terminal answer panel, confidence score, retrieval snapshot, evidence spans, and a reasoning-path table.
+
+### Run On Your Own Docs
 
 Tortus is designed to run locally against your own documentation.
 
 ```bash
-# 1. Initialize a local Tortus project
 tortus init
-
-# 2. Ingest your documents, Markdown files, or URLs
-tortus ingest README.md ./docs https://example.com
-
-# 3. Build the graph and vector index
+tortus ingest ./docs README.md
 tortus index
-
-# 4. Ask a question and trace the reasoning path
-tortus query "What does Tortus say about evidence-backed retrieval?" --explain
-
-# 5. Open the visual graph and query dashboard
-tortus serve --port 8010
-# Dashboard running at http://localhost:8010
+tortus query "Which docs explain the rollout risk?" --explain
 ```
 
+What each step does:
+
+| Step | Command | Result |
+| --- | --- | --- |
+| Create a workspace | `tortus init` | Writes `tortus.toml` and creates `.tortus/`. |
+| Snapshot sources | `tortus ingest ./docs README.md` | Stores normalized documents and chunks. |
+| Build retrieval graph | `tortus index` | Builds nodes, edges, embeddings, and vector index. |
+| Ask a question | `tortus query "..." --explain` | Returns answer, evidence, confidence, and hops. |
+
+Supported local file types are `.md`, `.mdx`, `.txt`, `.html`, `.htm`, and `.pdf`. URLs are supported when the `ingest` extra is installed:
+
+```bash
+tortus ingest ./docs https://example.com/post --refresh
+```
+
+### Open The Dashboard
+
+After `ingest` and `index`, start the diagnostic workbench:
+
+```bash
+tortus serve --port 8010
+```
+
+Then open `http://127.0.0.1:8010`. The dashboard shows the answer, evidence spans, selected hops, pruned candidates, portal usage, confidence, and unsupported claims.
+
+### Run From This Repo
+
+If you are working from the cloned repository instead of an installed package, prefix commands with `.venv/bin/`:
+
+```bash
+.venv/bin/tortus doctor
+.venv/bin/tortus ingest --corpus public-engineering --data-dir data
+.venv/bin/tortus index --corpus public-engineering --data-dir data
+.venv/bin/tortus query "How do service accounts connect to tracing?" \
+  --corpus public-engineering \
+  --data-dir data \
+  --explain
+```
+
+Use `--data-dir data` for repo benchmark commands because a local `tortus.toml` may point normal workspace commands at `.tortus/data`.
 ### Python API Usage
 
 You can also use Tortus directly in your Python code as a library:
 
 ```python
 import tortus
-from tortus.pipeline import Pipeline
+from tortus.config import Settings
+from tortus.pipeline import build_index, load_engine
 
-# Initialize the pipeline
-pipeline = Pipeline()
+settings = Settings(TORTUS_CORPUS="public-engineering")
+build_index(settings)
+engine = load_engine(settings)
 
 # Query the graph
-result = pipeline.query("How do service accounts connect to tracing?")
+result = engine.answer("How do service accounts connect to tracing?")
 
 # Print the synthesized answer
 print(result.answer)
@@ -87,14 +151,18 @@ for hop in result.reasoning_path:
     print(f"{hop.from_node} --[{hop.edge_type}]--> {hop.to_node}")
 ```
 
-To run the built-in benchmark corpus:
+### Run The Benchmark
+
+The benchmark is for development evidence, not the normal user path:
 
 ```bash
-.venv/bin/tortus ingest --corpus public-engineering
-.venv/bin/tortus index --layout torus --corpus public-engineering
-.venv/bin/tortus query "How did the token migration incident connect authentication and tracing?" --explain
+.venv/bin/tortus ingest --corpus public-engineering --data-dir data
+.venv/bin/tortus index --layout torus --corpus public-engineering --data-dir data
 .venv/bin/tortus golden-set --out data/golden_set.json --count 100
-.venv/bin/tortus eval --suite benchmark --strategies all \
+.venv/bin/tortus eval --suite benchmark --strategies all_with_external \
+  --corpus public-engineering \
+  --data-dir data \
+  --audit-file data/audits/golden100.codex-reviewed.jsonl \
   --json-out data/eval/benchmark.json \
   --duckdb-out data/eval/results.duckdb
 .venv/bin/tortus report \
@@ -103,23 +171,20 @@ To run the built-in benchmark corpus:
 .venv/bin/tortus serve --port 8010
 ```
 
-Or run the full local demo path:
+The eval command prints a compact strategy summary by default. Add `--rows` if you want every per-question row:
 
 ```bash
-scripts/demo.sh
+.venv/bin/tortus eval --suite smoke --strategies tortus_torus,vector_only_local --rows
 ```
 
-Run checks:
+### Developer Checks
+
+Use these before opening a PR or publishing a package:
 
 ```bash
 .venv/bin/ruff check .
 .venv/bin/mypy src/tortus scripts/run_pytest.py
 .venv/bin/python scripts/run_pytest.py
-```
-
-Release checks:
-
-```bash
 .venv/bin/python -m build
 .venv/bin/twine check dist/*
 .venv/bin/tortus release-check
@@ -130,25 +195,44 @@ Useful configuration:
 ```bash
 TORTUS_CORPUS=public-engineering
 TORTUS_EMBEDDING_PROVIDER=local
+TORTUS_EMBEDDING_MODEL=text-embedding-3-large
 TORTUS_VECTOR_BACKEND=exact
 TORTUS_GRAPHRAG_COMMAND=""
+TORTUS_LLAMA_INDEX_COMMAND=""
+TORTUS_LIGHTRAG_COMMAND=""
 ```
 
 `TORTUS_VECTOR_BACKEND=faiss` enables the optional FAISS index path when `faiss` is installed. Exact search remains the default because it is deterministic and easy to test.
 
-`TORTUS_GRAPHRAG_COMMAND` enables the optional `graphrag_external` baseline adapter. If the dependency or command is missing, benchmark reports mark that adapter as skipped rather than counting it as a win.
+`llamaindex_external` uses LlamaIndex Core directly when `llama-index-core` is installed. `TORTUS_GRAPHRAG_COMMAND` and `TORTUS_LIGHTRAG_COMMAND` enable the GraphRAG and LightRAG command adapters. If a dependency or command is missing, benchmark reports mark that adapter as skipped rather than counting it as a win.
 
-## User Document Ingestion
-
-Tortus can now run against a local workspace instead of only built-in fixtures:
+To use API embeddings:
 
 ```bash
-tortus init
+OPENAI_API_KEY=sk-...
+tortus index --embedding-provider openai --embedding-model text-embedding-3-large
+tortus query "How do service accounts connect to tracing?" --embedding-provider openai
+```
+
+Azure OpenAI embeddings use `TORTUS_EMBEDDING_PROVIDER=azure` plus `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_EMBEDDING_DEPLOYMENT`.
+
+To materialize external public snapshots:
+
+```bash
+tortus corpus fetch --fetch --materialize --corpus external-engineering
+tortus index --corpus external-engineering
+```
+
+The fetch writes raw responses, normalized text, headers, SHA256 hashes, retrieval timestamps, license notes, and extraction warnings under the configured cache and data directories.
+
+## User Document Ingestion Details
+
+The Quickstart above shows the normal workspace flow. A few useful ingestion variants:
+
+```bash
 tortus ingest ./docs
-tortus ingest README.md ./docs https://example.com/post
+tortus ingest README.md ./docs https://example.com
 tortus ingest --manifest sources.toml
-tortus index
-tortus query "Which docs explain the rollout risk?"
 ```
 
 Supported local file types are `.md`, `.mdx`, `.txt`, `.html`, `.htm`, and `.pdf`. URL ingestion stores a pinned raw snapshot, normalized text, metadata, SHA256, retrieval timestamp, content type, ETag, Last-Modified, and extraction warnings. HTML extraction uses `trafilatura` with BeautifulSoup fallback; PDF extraction uses `pypdf` and keeps empty/scanned PDFs as warned documents instead of pretending they worked.
@@ -410,6 +494,7 @@ Current V2 eval strategies:
 - `vector_only_local`
 - `bm25_local`
 - `hybrid_dense_bm25_local`
+- `hybrid_graph_rerank_local`
 - `graph_local`
 - `community_summary_local`
 - `bounded_agentic_local`
@@ -417,32 +502,49 @@ Current V2 eval strategies:
 - `euclidean_layout_local`
 - `random_layout_local`
 - `graphrag_external` when optional dependency and command configuration are present
+- `llamaindex_external` when LlamaIndex Core is installed, or when `TORTUS_LLAMA_INDEX_COMMAND` is configured as a fallback
+- `lightrag_external` when `TORTUS_LIGHTRAG_COMMAND` is configured
 
 The older unqualified strategy names remain accepted as CLI aliases and map to the `_local` strategies.
 
-Current V2 benchmark, using `tortus eval --suite benchmark --strategies all` over 118 questions and 1,180 strategy rows. A pass requires term recall >= 0.50, source recall >= 0.50, path recall >= 0.50, and faithfulness >= 0.50 for answerable questions. Negative questions pass only when unsupported answers are withheld:
+Current V2 benchmark, using `tortus eval --suite benchmark --strategies all_with_external --corpus public-engineering --data-dir data --audit-file data/audits/golden100.codex-reviewed.jsonl` over 118 questions and 1,652 strategy rows. LlamaIndex Core runs as a real external retriever baseline; GraphRAG and LightRAG are skipped unless their command configuration is present. A pass requires term recall >= 0.50, source recall >= 0.50, path recall >= 0.50, and faithfulness >= 0.50 for answerable questions. Negative questions pass only when unsupported answers are withheld:
 
 | Strategy | Pass | Source | Path | Precision | Faith | p95 ms | Portals | Fanout |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `tortus_torus` | 0.77 | 0.72 | 1.00 | 0.64 | 0.88 | 4.9 | 3.5 | 5.2 |
-| `bounded_agentic_local` | 0.64 | 0.63 | 0.95 | 0.86 | 0.89 | 3.3 | 3.0 | 4.4 |
-| `graph_local` | 0.14 | 0.57 | 0.17 | 0.34 | 0.88 | 2.5 | 0.0 | 4.3 |
-| `bm25_local` | 0.02 | 0.63 | 0.03 | 0.03 | 0.88 | 1.1 | 0.0 | 4.2 |
-| `community_summary_local` | 0.02 | 0.49 | 0.03 | 0.03 | 0.88 | 1.1 | 0.0 | 4.1 |
-| `hybrid_dense_bm25_local` | 0.01 | 0.69 | 0.03 | 0.03 | 0.88 | 2.1 | 0.0 | 4.4 |
-| `vector_only_local` | 0.01 | 0.68 | 0.03 | 0.03 | 0.88 | 0.9 | 0.0 | 4.3 |
-| `torus_layout_local` | 0.01 | 0.51 | 0.03 | 0.03 | 0.88 | 1.0 | 0.0 | 3.1 |
-| `euclidean_layout_local` | 0.01 | 0.45 | 0.03 | 0.03 | 0.89 | 0.9 | 0.0 | 3.1 |
-| `random_layout_local` | 0.00 | 0.22 | 0.03 | 0.03 | 0.89 | 0.9 | 0.0 | 4.3 |
+| `tortus_torus` | 0.80 | 0.73 | 1.00 | 0.64 | 0.88 | 3.4 | 3.5 | 5.2 |
+| `hybrid_graph_rerank_local` | 0.80 | 0.74 | 1.00 | 0.82 | 0.88 | 5.7 | 27.9 | 8.8 |
+| `bounded_agentic_local` | 0.73 | 0.67 | 0.95 | 0.86 | 0.89 | 3.0 | 3.0 | 4.4 |
+| `graph_local` | 0.14 | 0.58 | 0.17 | 0.34 | 0.88 | 2.2 | 0.0 | 4.3 |
+| `llamaindex_external` | 0.01 | 0.72 | 0.03 | 0.03 | 0.88 | 7.5 | 0.0 | 4.3 |
+| `hybrid_dense_bm25_local` | 0.01 | 0.73 | 0.03 | 0.03 | 0.88 | 1.5 | 0.0 | 4.4 |
+| `vector_only_local` | 0.01 | 0.71 | 0.03 | 0.03 | 0.88 | 0.8 | 0.0 | 4.3 |
+| `bm25_local` | 0.02 | 0.65 | 0.03 | 0.03 | 0.88 | 1.0 | 0.0 | 4.2 |
+| `community_summary_local` | 0.02 | 0.52 | 0.03 | 0.03 | 0.88 | 1.0 | 0.0 | 4.1 |
+| `torus_layout_local` | 0.01 | 0.58 | 0.03 | 0.03 | 0.88 | 1.0 | 0.0 | 3.1 |
+| `euclidean_layout_local` | 0.01 | 0.52 | 0.03 | 0.03 | 0.89 | 0.8 | 0.0 | 3.1 |
+| `random_layout_local` | 0.01 | 0.32 | 0.03 | 0.03 | 0.89 | 0.8 | 0.0 | 4.3 |
 
-The positive signal is full benchmark path recall with improved selectivity: Tortus now clears the V2 targets of pass >= 0.70, path recall >= 0.90, path precision >= 0.60, mean fanout <= 5.5, and mean portal hops <= 5.0. The remaining caveat is external validity: because the corpus, extraction, embeddings, and labels are still controlled fixtures or source-backed summaries, this table should be read as a V2 harness result, not as proof that toroidal retrieval beats production systems.
+The current signal is useful but still not a broad superiority claim: Tortus and the stronger graph reranker both reach 0.80 pass rate and full path recall on the assistant-reviewed benchmark, while LlamaIndex Core provides a real external vector-retrieval comparison with strong source recall but weak path recall because it does not model hops. Tortus is more selective than `hybrid_graph_rerank_local` on portal hops and fanout, but it still needs better source selection and a real GraphRAG/LightRAG run before external validity claims are fair.
 
-The `data/golden_set.json` file is a deterministic 100-question curated golden set with expected evidence URIs and hop targets. Its `audit_status` is intentionally `curated_pending_human_signoff`; it is ready for maintainer review, not presented as a completed externally reviewed benchmark.
+GraphRAG and LightRAG were requested in the latest benchmark run, but their 236 external rows were skipped because no command template was configured. The report records those skipped reasons instead of counting them as wins.
+
+The `data/golden_set.json` file is a deterministic 100-question curated golden set with expected evidence URIs and hop targets. `data/audits/golden100.codex-reviewed.jsonl` is an assistant-reviewed label audit used for current regression runs. It is not human signoff.
+
+Human-audited labels are applied through JSONL, not by mutating generated rows in place:
+
+```bash
+tortus audit export --suite golden100 --out data/audits/golden100.audit.jsonl
+# review expected_evidence_uris, expected_path_labels, status, auditor, reviewed_at, and notes
+tortus audit import data/audits/golden100.audit.jsonl --out data/audits/golden100.reviewed.jsonl
+tortus eval --suite benchmark --audit-file data/audits/golden100.reviewed.jsonl
+```
+
+Rows only report `human_reviewed` when a review file includes approved/reviewed status, auditor, reviewed timestamp, and a human review type. Codex-reviewed rows are reported separately as `assistant_reviewed`.
 
 Remaining work for a publishable external result:
 
-- replace or supplement local approximations with external GraphRAG and agentic-search implementations
-- scale beyond source-backed summaries to larger commit-pinned public engineering snapshots
+- run configured external GraphRAG and LightRAG workspaces on the same materialized snapshots
+- scale beyond the current public-source manifest to larger commit-pinned public engineering snapshots
 - have a human maintainer audit and sign off the 100-question curated golden set
 - profile real API-backed embedding and synthesis cost
 

@@ -327,11 +327,14 @@ def run_eval(
     engine: QueryEngine,
     suite: str = "smoke",
     strategies: tuple[str, ...] = STRATEGIES,
+    audit_file: Path | None = None,
 ) -> EvalReport:
     """Run a suite across selected retrieval strategies."""
     rows: list[EvalRow] = []
     policy = TraversalPolicy(max_hops=3, max_nodes=32)
     questions = questions_for_suite(suite)
+    if audit_file is not None:
+        questions = apply_audit_file(questions, audit_file)
     for question in questions:
         for strategy in strategies:
             started = time.perf_counter()
@@ -340,7 +343,7 @@ def run_eval(
             evidence_text = " ".join(span.text.lower() for span in run.evidence)
             term_hits = sum(term in evidence_text for term in question.expected_terms)
             returned_sources = {span.uri for span in run.evidence}
-            source_hits = len(returned_sources.intersection(question.expected_sources))
+            source_hits = count_source_matches(question.expected_sources, returned_sources)
             path_hits = len(set(run.path_edge_types).intersection(question.expected_edge_types))
             path_recall = (
                 path_hits / len(question.expected_edge_types)
@@ -406,6 +409,106 @@ def run_smoke_eval(
     return run_eval(engine, suite="smoke", strategies=strategies)
 
 
+def count_source_matches(
+    expected_sources: Sequence[str],
+    returned_sources: Sequence[str] | set[str],
+) -> int:
+    """Count expected sources with at least one matching returned evidence URI."""
+    returned = tuple(returned_sources)
+    return sum(
+        any(source_uri_matches(expected, candidate) for candidate in returned)
+        for expected in expected_sources
+    )
+
+
+def source_uri_matches(expected: str, returned: str) -> bool:
+    """Return whether two evidence URIs identify the same source."""
+    expected_base = canonical_source_uri(expected)
+    returned_base = canonical_source_uri(returned)
+    return (
+        expected_base == returned_base
+        or expected_base in SOURCE_EQUIVALENTS.get(returned_base, set())
+        or returned_base in SOURCE_EQUIVALENTS.get(expected_base, set())
+    )
+
+
+def canonical_source_uri(uri: str) -> str:
+    """Normalize evidence URIs for source-level matching."""
+    base = uri.split("#", 1)[0]
+    return base.rstrip("/")
+
+
+SOURCE_EQUIVALENTS: dict[str, set[str]] = {
+    "builtin://kubernetes/kep-service-account-tokens": {
+        "public://kubernetes/docs/service-accounts-admin@tortus-v1",
+        "public://kubernetes/docs/projected-volumes@tortus-v1",
+    },
+    "builtin://opentelemetry/context-propagation": {
+        "public://opentelemetry/spec/context@tortus-v1",
+        "public://w3c/trace-context@tortus-v1",
+    },
+}
+
+
+def apply_audit_file(questions: tuple[EvalQuestion, ...], path: Path) -> tuple[EvalQuestion, ...]:
+    """Apply imported human-audit labels to eval questions."""
+    if not path.exists():
+        raise FileNotFoundError(f"audit file does not exist: {path}")
+    from .audit import AuditRecord
+
+    records: dict[str, AuditRecord] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            parsed_record = AuditRecord.model_validate_json(line)
+            records[parsed_record.id] = parsed_record
+    audited: list[EvalQuestion] = []
+    for question in questions:
+        record = records.get(question.id)
+        if record is None:
+            audited.append(question)
+            continue
+        status = normalized_audit_status(record)
+        use_reviewed_labels = status in {"human_reviewed", "assistant_reviewed"}
+        audited.append(
+            EvalQuestion(
+                id=question.id,
+                suite=question.suite,
+                question=record.question if use_reviewed_labels else question.question,
+                expected_terms=tuple(record.expected_terms)
+                if use_reviewed_labels
+                else question.expected_terms,
+                expected_sources=tuple(record.expected_sources)
+                if use_reviewed_labels
+                else question.expected_sources,
+                expected_edge_types=tuple(record.expected_edge_types)
+                if use_reviewed_labels
+                else question.expected_edge_types,
+                expect_answer=record.expect_answer
+                if use_reviewed_labels
+                else question.expect_answer,
+                audit_status=status,
+            )
+        )
+    return tuple(audited)
+
+
+def normalized_audit_status(record: object) -> str:
+    """Return a report-safe status label for an audit record."""
+    status = str(getattr(record, "status", "pending")).strip().lower()
+    review_type = str(getattr(record, "review_type", "human")).strip().lower()
+    auditor = str(getattr(record, "auditor", "")).strip()
+    reviewed_at = str(getattr(record, "reviewed_at", "")).strip()
+    if status in {"approved", "human_reviewed", "reviewed"} and auditor and reviewed_at:
+        if review_type in {"assistant", "codex", "ai"}:
+            return "assistant_reviewed"
+        return "human_reviewed"
+    if status in {"approved", "human_reviewed", "reviewed"}:
+        return "reviewed_missing_metadata"
+    if status in {"rejected", "invalid"}:
+        return "human_rejected"
+    return f"audit_{status or 'pending'}"
+
+
 def questions_for_suite(suite: str) -> tuple[EvalQuestion, ...]:
     """Return labeled questions for a named suite."""
     if suite == "smoke":
@@ -461,9 +564,8 @@ def score_path_precision(
     if not returned_edge_types:
         return 1.0 if not expected_edge_types else 0.0
     expected_edges = set(expected_edge_types)
-    expected_source_set = set(expected_sources)
     edge_matches = sum(edge_type in expected_edges for edge_type in returned_edge_types)
-    source_bonus = 1 if returned_sources.intersection(expected_source_set) else 0
+    source_bonus = 1 if count_source_matches(expected_sources, returned_sources) else 0
     return min(1.0, (edge_matches + source_bonus) / max(1, len(returned_edge_types)))
 
 
