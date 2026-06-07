@@ -1,12 +1,15 @@
 """Command-line interface for Tortus workflows."""
 
-import json
+from collections import Counter
 from pathlib import Path
 from typing import Annotated
 
 import typer
 import uvicorn
+from rich import box
 from rich.console import Console
+from rich.markup import escape
+from rich.panel import Panel
 from rich.table import Table
 
 from .api import create_app
@@ -24,7 +27,7 @@ from .golden import write_candidate_golden_set
 from .models import TraversalPolicy
 from .pipeline import build_index, data_paths, ingest_builtin, ingest_sources, load_engine
 from .release import run_doctor, run_release_check
-from .report import generate_markdown_report
+from .report import generate_markdown_report, strategy_summaries
 
 app = typer.Typer(help="Tortus: toroidal semantic graph retrieval.")
 corpus_app = typer.Typer(help="Pinned public corpus workflows.")
@@ -32,6 +35,96 @@ audit_app = typer.Typer(help="Human audit import/export workflows.")
 console = Console()
 app.add_typer(corpus_app, name="corpus")
 app.add_typer(audit_app, name="audit")
+
+
+def key_value_grid(rows: list[tuple[str, str]]) -> Table:
+    """Build a compact key-value grid for terminal summaries."""
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="bold white", no_wrap=True)
+    grid.add_column()
+    for key, value in rows:
+        grid.add_row(key, value)
+    return grid
+
+
+def print_summary_panel(
+    title: str,
+    rows: list[tuple[str, str]],
+    *,
+    style: str = "cyan",
+    subtitle: str | None = None,
+) -> None:
+    """Print a titled summary panel."""
+    console.print(
+        Panel(
+            key_value_grid(rows),
+            title=f"[bold]{escape(title)}[/bold]",
+            border_style=style,
+            padding=(1, 2),
+            subtitle=subtitle,
+        )
+    )
+
+
+def print_message_panel(
+    title: str,
+    message: str,
+    *,
+    style: str = "cyan",
+    subtitle: str | None = None,
+) -> None:
+    """Print a titled text panel."""
+    console.print(
+        Panel(
+            message,
+            title=f"[bold]{escape(title)}[/bold]",
+            border_style=style,
+            padding=(1, 2),
+            subtitle=subtitle,
+        )
+    )
+
+
+def print_next_steps(*steps: str) -> None:
+    """Print concise next-step hints."""
+    if not steps:
+        return
+    lines = "\n".join(
+        f"[bold cyan]{index}.[/bold cyan] {step}" for index, step in enumerate(steps, 1)
+    )
+    print_message_panel("Next Steps", lines, style="blue")
+
+
+def print_warnings(warnings: list[str]) -> None:
+    """Print warnings in a consistent terminal panel."""
+    if not warnings:
+        return
+    text = "\n".join(f"[yellow]{escape(warning)}[/yellow]" for warning in warnings[:8])
+    if len(warnings) > 8:
+        text += f"\n[dim]... {len(warnings) - 8} more warnings omitted[/dim]"
+    print_message_panel("Warnings", text, style="yellow")
+
+
+def styled_path(path: Path | str) -> str:
+    """Return a path formatted for Rich output."""
+    return f"[cyan]{escape(str(path))}[/cyan]"
+
+
+def truncate_text(value: str, width: int = 110) -> str:
+    """Return text clipped for compact terminal tables."""
+    collapsed = " ".join(value.split())
+    if len(collapsed) <= width:
+        return collapsed
+    return collapsed[: max(0, width - 3)] + "..."
+
+
+def compact_identifier(value: str, width: int = 36) -> str:
+    """Return a compact identifier that keeps both prefix and suffix context."""
+    collapsed = " ".join(value.split())
+    if len(collapsed) <= width:
+        return collapsed
+    prefix = max(6, width - 12)
+    return f"{collapsed[:prefix]}...{collapsed[-8:]}"
 
 
 @app.command()
@@ -47,7 +140,20 @@ def init(
     config_path.write_text(default_project_config(), encoding="utf-8")
     Path(".tortus/data").mkdir(parents=True, exist_ok=True)
     Path(".tortus/cache").mkdir(parents=True, exist_ok=True)
-    console.print(f"initialized {config_path} and .tortus/")
+    print_summary_panel(
+        "Tortus Workspace Ready",
+        [
+            ("Config", styled_path(config_path)),
+            ("Data", styled_path(".tortus/data")),
+            ("Cache", styled_path(".tortus/cache")),
+        ],
+        style="green",
+    )
+    print_next_steps(
+        "[bold]tortus ingest ./docs[/bold] to snapshot your documents",
+        "[bold]tortus index[/bold] to build the graph",
+        "[bold]tortus query \"your question\" --explain[/bold] to inspect retrieval",
+    )
 
 
 @app.command()
@@ -72,21 +178,42 @@ def ingest(
     source_values = sources or []
     if source_values or manifest is not None:
         settings = settings_with_overrides(settings, corpus="workspace")
-        result = ingest_sources(settings, source_values, manifest=manifest, refresh=refresh)
-        console.print(f"Ingested {result.documents} documents and {result.chunks} chunks")
-        console.print(f"snapshot={result.out_dir}")
-        console.print(f"manifest={result.manifest_path}")
-        for warning in result.warnings[:8]:
-            console.print(f"[yellow]warning:[/yellow] {warning}")
+        with console.status("[bold cyan]Snapshotting workspace sources...[/bold cyan]"):
+            result = ingest_sources(settings, source_values, manifest=manifest, refresh=refresh)
+        print_summary_panel(
+            "Workspace Ingest Complete",
+            [
+                ("Documents", f"[bold green]{result.documents}[/bold green]"),
+                ("Chunks", f"[bold green]{result.chunks}[/bold green]"),
+                ("Snapshot", styled_path(result.out_dir)),
+                ("Manifest", styled_path(result.manifest_path)),
+            ],
+            style="green",
+        )
+        print_warnings(result.warnings)
+        print_next_steps("[bold]tortus index[/bold] to build the graph for this snapshot")
         return
 
     active_corpus = corpus or settings.tortus_corpus
     if active_corpus == "workspace":
         raise typer.BadParameter("workspace ingestion requires sources or --manifest")
     settings = settings_with_overrides(settings, corpus=active_corpus)
-    documents, chunks = ingest_builtin(settings, corpus=active_corpus)
+    with console.status(f"[bold cyan]Preparing corpus {escape(active_corpus)}...[/bold cyan]"):
+        documents, chunks = ingest_builtin(settings, corpus=active_corpus)
     corpus_dir = data_paths(settings)["corpus"]
-    console.print(f"Ingested {documents} documents and {chunks} chunks into {corpus_dir}")
+    print_summary_panel(
+        "Corpus Ingest Complete",
+        [
+            ("Corpus", f"[bold]{escape(active_corpus)}[/bold]"),
+            ("Documents", f"[bold green]{documents}[/bold green]"),
+            ("Chunks", f"[bold green]{chunks}[/bold green]"),
+            ("Output", styled_path(corpus_dir)),
+        ],
+        style="green",
+    )
+    print_next_steps(
+        f"[bold]tortus index --corpus {escape(active_corpus)}[/bold] to build the graph"
+    )
 
 
 @app.command()
@@ -113,9 +240,27 @@ def index(
         embedding_provider=embedding_provider,
         embedding_model=embedding_model,
     )
-    stats = build_index(settings, corpus=settings.tortus_corpus)
-    console.print("Built Tortus index")
-    console.print_json(json.dumps(stats))
+    with console.status(
+        f"[bold cyan]Building {escape(settings.tortus_corpus)} graph index...[/bold cyan]"
+    ):
+        stats = build_index(settings, corpus=settings.tortus_corpus)
+    print_summary_panel(
+        "Tortus Index Built",
+        [
+            ("Corpus", f"[bold]{escape(settings.tortus_corpus)}[/bold]"),
+            ("Layout", f"[bold]{escape(layout)}[/bold]"),
+            ("Embedding", f"{escape(settings.tortus_embedding_provider)}"),
+            ("Nodes", f"[bold green]{stats['nodes']}[/bold green]"),
+            ("Edges", f"[bold green]{stats['edges']}[/bold green]"),
+            ("Portal edges", f"[bold green]{stats['portal_edges']}[/bold green]"),
+            ("Schema", str(stats["schema_version"])),
+        ],
+        style="green",
+    )
+    print_next_steps(
+        "[bold]tortus query \"your question\" --explain[/bold] to inspect retrieval",
+        "[bold]tortus serve[/bold] to open the diagnostic workbench",
+    )
 
 
 @app.command()
@@ -143,26 +288,81 @@ def query(
         embedding_provider=embedding_provider,
         embedding_model=embedding_model,
     )
-    engine = load_engine(settings)
-    result = engine.answer(
-        text,
-        policy=TraversalPolicy(max_hops=max_hops, local_only=local_only, explain_hops=explain),
+    with console.status("[bold cyan]Loading Tortus engine...[/bold cyan]"):
+        engine = load_engine(settings)
+    with console.status("[bold cyan]Traversing graph and grounding answer...[/bold cyan]"):
+        result = engine.answer(
+            text,
+            policy=TraversalPolicy(max_hops=max_hops, local_only=local_only, explain_hops=explain),
+        )
+
+    confidence_style = "green" if result.confidence >= 0.65 else "yellow"
+    print_message_panel(
+        "Answer",
+        escape(result.answer.strip() or "No answer text returned."),
+        style=confidence_style,
+        subtitle=(
+            f"confidence {result.confidence:.2f} | nodes {result.budget.nodes_visited} | "
+            f"hops {result.budget.hops_taken} | portals {result.budget.portal_hops}"
+        ),
     )
-    console.print(result.answer)
-    console.print(f"confidence={result.confidence:.2f} nodes={result.budget.nodes_visited}")
-    if result.warnings:
-        console.print("[yellow]warnings:[/yellow] " + "; ".join(result.warnings))
+    print_summary_panel(
+        "Retrieval Snapshot",
+        [
+            ("Corpus", f"[bold]{escape(settings.tortus_corpus)}[/bold]"),
+            ("Evidence spans", f"[bold green]{len(result.evidence)}[/bold green]"),
+            ("Shard fanout", str(result.budget.shard_fanout)),
+            ("Shard crossings", str(result.budget.shard_crossings)),
+            ("Tokens estimated", str(result.budget.tokens_estimated)),
+            ("Unsupported claims", str(len(result.trace.unsupported_claims))),
+        ],
+        style="cyan",
+    )
+    if result.evidence:
+        evidence_table = Table(
+            title="Evidence",
+            box=box.SIMPLE_HEAVY,
+            header_style="bold cyan",
+            show_lines=False,
+            expand=True,
+        )
+        evidence_table.add_column("source", no_wrap=True)
+        evidence_table.add_column("range", justify="right", no_wrap=True)
+        evidence_table.add_column("span", overflow="fold")
+        for span in result.evidence[:6]:
+            evidence_table.add_row(
+                escape(compact_identifier(span.uri, 34)),
+                f"{span.start}-{span.end}",
+                escape(truncate_text(span.text, 120)),
+            )
+        console.print(evidence_table)
+    print_warnings(result.warnings)
     if explain:
-        table = Table("from", "to", "edge", "weight", "score", "terms", "reason")
-        for hop in result.reasoning_path[:20]:
+        table = Table(
+            title="Reasoning Path",
+            box=box.SIMPLE_HEAVY,
+            header_style="bold cyan",
+            show_lines=False,
+            expand=True,
+        )
+        table.add_column("#", justify="right", no_wrap=True)
+        table.add_column("path", overflow="fold")
+        table.add_column("edge", no_wrap=True)
+        table.add_column("score", justify="right")
+        table.add_column("why", overflow="fold")
+        for index, hop in enumerate(result.reasoning_path[:20], 1):
+            path = (
+                f"{compact_identifier(hop.from_node, 14)} -> "
+                f"{compact_identifier(hop.to_node, 14)}"
+            )
+            terms = truncate_text(", ".join(hop.matched_terms), 40)
+            why = hop.reason if not terms else f"{terms} | {hop.reason}"
             table.add_row(
-                hop.from_node,
-                hop.to_node,
+                str(index),
+                escape(path),
                 hop.edge_type.value,
-                f"{hop.weight:.2f}",
                 f"{hop.score:.2f}",
-                ", ".join(hop.matched_terms),
-                hop.reason,
+                escape(truncate_text(why, 72)),
             )
         console.print(table)
 
@@ -196,6 +396,7 @@ def eval_command(
         Path | None,
         typer.Option(help="Override TORTUS_DATA_DIR for this command."),
     ] = None,
+    show_rows: bool = typer.Option(False, "--rows", help="Print the row-level eval table."),
 ) -> None:
     """Run an evaluation suite."""
     try:
@@ -213,52 +414,117 @@ def eval_command(
         embedding_provider=embedding_provider,
         embedding_model=embedding_model,
     )
-    report = run_eval(
-        load_engine(settings),
-        suite=suite,
-        strategies=selected_strategies,
-        audit_file=audit_file,
-    )
-    table = Table(
-        "question",
-        "suite",
-        "strategy",
-        "term",
-        "source",
-        "path",
-        "latency_ms",
-        "nodes",
-        "hops",
-        "portals",
-        "fanout",
-        "cross",
-        "tokens",
-    )
-    for row in report.rows:
-        table.add_row(
-            row.question_id,
-            row.suite,
-            row.strategy,
-            f"{row.term_recall:.2f}",
-            f"{row.source_recall:.2f}",
-            f"{row.path_recall:.2f}",
-            f"{row.latency_ms:.1f}",
-            str(row.nodes_visited),
-            str(row.hops_taken),
-            str(row.portal_hops),
-            str(row.shard_fanout),
-            str(row.shard_crossings),
-            str(row.tokens_estimated),
+    with console.status(
+        f"[bold cyan]Running {escape(suite)} eval across "
+        f"{len(selected_strategies)} strategies...[/bold cyan]"
+    ):
+        report = run_eval(
+            load_engine(settings),
+            suite=suite,
+            strategies=selected_strategies,
+            audit_file=audit_file,
         )
-    console.print(table)
-    for strategy in report.strategies():
-        console.print(f"{strategy}_pass_rate={report.pass_rate(strategy):.2f}")
+    audit_counts = Counter(row.audit_status for row in report.rows)
+    print_summary_panel(
+        "Evaluation Complete",
+        [
+            ("Suite", f"[bold]{escape(suite)}[/bold]"),
+            ("Rows", f"[bold green]{len(report.rows)}[/bold green]"),
+            ("Strategies", str(len(report.strategies()))),
+            ("Corpus", f"[bold]{escape(settings.tortus_corpus)}[/bold]"),
+            (
+                "Audit status",
+                ", ".join(
+                    f"{escape(status)}={count}" for status, count in sorted(audit_counts.items())
+                ),
+            ),
+        ],
+        style="green",
+    )
+
+    summary_table = Table(
+        title="Strategy Summary",
+        box=box.SIMPLE_HEAVY,
+        header_style="bold cyan",
+        expand=True,
+    )
+    summary_table.add_column("strategy", no_wrap=True)
+    summary_table.add_column("pass", justify="right")
+    summary_table.add_column("src", justify="right")
+    summary_table.add_column("path", justify="right")
+    summary_table.add_column("prec", justify="right")
+    summary_table.add_column("faith", justify="right")
+    summary_table.add_column("p95 ms", justify="right")
+    summary_table.add_column("fanout", justify="right")
+    summary_table.add_column("skip", justify="right")
+    for summary in strategy_summaries(report):
+        style = "dim" if summary.skipped_rate >= 1.0 else None
+        if summary.strategy == "tortus_torus":
+            style = "bold cyan"
+        summary_table.add_row(
+            summary.strategy,
+            f"{summary.pass_rate:.2f}",
+            f"{summary.source_recall:.2f}",
+            f"{summary.path_recall:.2f}",
+            f"{summary.path_precision:.2f}",
+            f"{summary.faithfulness:.2f}",
+            f"{summary.p95_latency_ms:.1f}",
+            f"{summary.mean_shard_fanout:.1f}",
+            f"{summary.skipped_rate:.2f}",
+            style=style,
+        )
+    console.print(summary_table)
+
+    if show_rows:
+        table = Table(
+            title="Eval Rows",
+            box=box.SIMPLE_HEAVY,
+            header_style="bold cyan",
+            expand=True,
+        )
+        for column in (
+            "question",
+            "suite",
+            "strategy",
+            "term",
+            "source",
+            "path",
+            "latency_ms",
+            "nodes",
+            "hops",
+            "portals",
+            "fanout",
+            "cross",
+            "tokens",
+        ):
+            table.add_column(column, overflow="fold")
+        for row in report.rows:
+            table.add_row(
+                row.question_id,
+                row.suite,
+                row.strategy,
+                f"{row.term_recall:.2f}",
+                f"{row.source_recall:.2f}",
+                f"{row.path_recall:.2f}",
+                f"{row.latency_ms:.1f}",
+                str(row.nodes_visited),
+                str(row.hops_taken),
+                str(row.portal_hops),
+                str(row.shard_fanout),
+                str(row.shard_crossings),
+                str(row.tokens_estimated),
+            )
+        console.print(table)
     if json_out:
         write_eval_json(report, json_out)
-        console.print(f"wrote_json={json_out}")
+        print_summary_panel("JSON Report Written", [("Path", styled_path(json_out))], style="green")
     if duckdb_out:
         run_id = write_eval_duckdb(report, duckdb_out)
-        console.print(f"wrote_duckdb={duckdb_out} run_id={run_id}")
+        print_summary_panel(
+            "DuckDB Report Written",
+            [("Path", styled_path(duckdb_out)), ("Run ID", f"[dim]{escape(run_id)}[/dim]")],
+            style="green",
+        )
 
 
 @app.command(name="report")
@@ -278,7 +544,15 @@ def report_command(
     report = EvalReport.model_validate_json(eval_json.read_text(encoding="utf-8"))
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(generate_markdown_report(report), encoding="utf-8")
-    console.print(f"wrote_report={out}")
+    print_summary_panel(
+        "Markdown Report Written",
+        [
+            ("Input", styled_path(eval_json)),
+            ("Output", styled_path(out)),
+            ("Rows", str(len(report.rows))),
+        ],
+        style="green",
+    )
 
 
 @app.command(name="golden-set")
@@ -290,8 +564,13 @@ def golden_set_command(
     count: int = typer.Option(100, help="Number of candidate questions to generate."),
 ) -> None:
     """Generate the deterministic curated golden set."""
-    write_candidate_golden_set(out, count=count)
-    console.print(f"wrote_golden_set={out} count={count}")
+    with console.status("[bold cyan]Generating candidate golden set...[/bold cyan]"):
+        write_candidate_golden_set(out, count=count)
+    print_summary_panel(
+        "Golden Set Written",
+        [("Path", styled_path(out)), ("Questions", f"[bold green]{count}[/bold green]")],
+        style="green",
+    )
 
 
 @app.command()
@@ -303,28 +582,61 @@ def serve(
     """Serve the GraphQL API and dashboard."""
     fastapi_app = create_app()
     if dry_run:
-        console.print("Tortus app created successfully")
-        console.print(f"routes={len(fastapi_app.routes)}")
+        print_summary_panel(
+            "Server Dry Run Passed",
+            [("Routes", f"[bold green]{len(fastapi_app.routes)}[/bold green]")],
+            style="green",
+        )
         return
+    print_summary_panel(
+        "Starting Tortus Server",
+        [
+            ("API", f"[cyan]http://{escape(host)}:{port}/graphql[/cyan]"),
+            ("Dashboard", f"[cyan]http://{escape(host)}:{port}/[/cyan]"),
+        ],
+        style="cyan",
+    )
     uvicorn.run(fastapi_app, host=host, port=port)
 
 
 @app.command()
 def paths() -> None:
     """Print the active Tortus data paths."""
-    for name, path in data_paths(get_settings()).items():
-        console.print(f"{name}: {Path(path)}")
+    print_summary_panel(
+        "Active Data Paths",
+        [(name, styled_path(Path(path))) for name, path in data_paths(get_settings()).items()],
+        style="cyan",
+    )
 
 
 @app.command()
 def doctor() -> None:
     """Check installed package assets, optional dependencies, and data paths."""
-    table = Table("check", "ok", "detail")
+    table = Table(
+        title="Doctor Checks",
+        box=box.SIMPLE_HEAVY,
+        header_style="bold cyan",
+        expand=True,
+    )
+    table.add_column("check", overflow="fold")
+    table.add_column("status", no_wrap=True)
+    table.add_column("detail", overflow="fold")
     failed = False
     for check in run_doctor(get_settings()):
         failed = failed or not check.ok and not check.name.startswith("optional dependency")
-        table.add_row(check.name, "yes" if check.ok else "no", check.detail)
+        status = "[green]ok[/green]" if check.ok else "[yellow]missing[/yellow]"
+        if not check.ok and not check.name.startswith("optional dependency"):
+            status = "[red]fail[/red]"
+        table.add_row(check.name, status, escape(check.detail))
     console.print(table)
+    if failed:
+        print_message_panel("Doctor Failed", "A required check failed.", style="red")
+    else:
+        print_message_panel(
+            "Doctor Passed",
+            "Required package assets and runtime paths are available.",
+            style="green",
+        )
     if failed:
         raise typer.Exit(code=1)
 
@@ -332,8 +644,14 @@ def doctor() -> None:
 @app.command(name="release-check")
 def release_check() -> None:
     """Build, inspect, install, and smoke-test release artifacts."""
-    for message in run_release_check(Path.cwd()):
-        console.print(message)
+    messages: list[str] = []
+    with console.status("[bold cyan]Running release checks...[/bold cyan]"):
+        messages = list(run_release_check(Path.cwd()))
+    print_message_panel(
+        "Release Check Passed",
+        "\n".join(f"[green]{escape(message)}[/green]" for message in messages),
+        style="green",
+    )
 
 
 @corpus_app.command(name="fetch")
@@ -359,14 +677,21 @@ def corpus_fetch(
         materialize=materialize,
         corpus_name=corpus_name,
     )
-    console.print(f"sources={result.sources} fetched={result.fetched}")
-    console.print(f"manifest={result.out_path}")
+    rows = [
+        ("Sources", f"[bold green]{result.sources}[/bold green]"),
+        ("Fetched", f"[bold green]{result.fetched}[/bold green]"),
+        ("Manifest", styled_path(result.out_path)),
+    ]
     if result.corpus_path:
-        console.print(
-            f"corpus={result.corpus_path} documents={result.documents} chunks={result.chunks}"
+        rows.extend(
+            [
+                ("Corpus", styled_path(result.corpus_path)),
+                ("Documents", f"[bold green]{result.documents}[/bold green]"),
+                ("Chunks", f"[bold green]{result.chunks}[/bold green]"),
+            ]
         )
-    for warning in result.warnings[:8]:
-        console.print(f"[yellow]warning:[/yellow] {warning}")
+    print_summary_panel("Public Corpus Snapshot", rows, style="green")
+    print_warnings(result.warnings)
 
 
 @audit_app.command(name="export")
@@ -379,7 +704,15 @@ def audit_export(
 ) -> None:
     """Export benchmark labels for human audit."""
     count = export_audit_suite(suite, out)
-    console.print(f"wrote_audit={out} rows={count}")
+    print_summary_panel(
+        "Audit File Exported",
+        [
+            ("Suite", f"[bold]{escape(suite)}[/bold]"),
+            ("Rows", f"[bold green]{count}[/bold green]"),
+            ("Path", styled_path(out)),
+        ],
+        style="green",
+    )
 
 
 @audit_app.command(name="import")
@@ -392,4 +725,12 @@ def audit_import(
 ) -> None:
     """Validate and persist human-audited benchmark labels."""
     count = import_audit_records(path, out=out)
-    console.print(f"imported_audit_rows={count}")
+    print_summary_panel(
+        "Audit File Imported",
+        [
+            ("Rows", f"[bold green]{count}[/bold green]"),
+            ("Source", styled_path(path)),
+            ("Output", styled_path(out or Path("data/audits") / f"{path.stem}.imported.jsonl")),
+        ],
+        style="green",
+    )
