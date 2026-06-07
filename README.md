@@ -36,7 +36,6 @@ pip install tortus-rag
 ```
 
 For PDF, HTML, and URL ingestion, install the ingestion extra:
-
 ```bash
 pip install "tortus-rag[ingest]"
 ```
@@ -128,7 +127,6 @@ If you are working from the cloned repository instead of an installed package, p
 ```
 
 Use `--data-dir data` for repo benchmark commands because a local `tortus.toml` may point normal workspace commands at `.tortus/data`.
-
 ### Python API Usage
 
 You can also use Tortus directly in your Python code as a library:
