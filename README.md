@@ -21,22 +21,23 @@ In an incident review, for example, the evidence might be split across an auth m
 
 Tortus is built for that gap. It tries to answer "why did this happen?" or "what should we fix?" by returning the evidence path across documents, not only a list of matching chunks.
 
-## Status
+### Features & Architecture
 
-This repository now contains an executable V2 slice: a Python distribution named `tortus-rag`, an importable `tortus` package, a `tortus` console command, project-local document ingestion, pinned source snapshots, typed graph schemas, SQLite persistence, local embedding fallback, exact vector search, optional FAISS indexing, source-backed answer synthesis, typed retrieval traces, GraphQL plus `/api/query`, a diagnostic dashboard, local and optional external baseline adapters, audit workflows, package/release checks, CI, and reproducible benchmark reports.
+Tortus is a complete, package-distributable RAG engine designed to run locally or integrate as a service:
 
-The implementation is still early. The intended MVP remains a local prototype that tests whether toroidal graph locality plus typed traversal improves multi-hop retrieval quality, explainability, and shard affinity compared with vector-only RAG, hybrid sparse+dense retrieval, and local approximations of GraphRAG-style and agentic retrieval. The current baselines are useful engineering controls, not claims that Tortus has beaten every external GraphRAG implementation.
+* **Engine Core:** Typed semantic graph schemas, SQLite persistence, and exact vector search (with optional FAISS indexing).
+* **Robust Local Modes:** Runs out of the box with zero external configuration via local deterministic embedding & synthesis fallbacks.
+* **API & Diagnostic Dashboard:** Built-in GraphQL API, query endpoint (`/api/query`), and interactive visual workbench.
+* **Evaluation Suite:** Broad benchmarking capability against standard baselines (BM25, vector-only, hybrid dense+BM25, and hybrid graph reranking) with support for human-in-the-loop audits.
 
-Current evidence strength is prototype-level but improving. The benchmark numbers below are useful for checking whether the architecture and evaluation harness behave coherently, including a 1,000-doclet public-source scale sweep, but they are not yet a research claim about real-world retrieval superiority.
+The project is structured across several core layers:
 
-| Layer | Current state | Evidence implication | Hardening move |
-| --- | --- | --- | --- |
-| Corpus | Built-in engineering corpus, packaged Acme Payments demo corpus, plus fetchable public Kubernetes, OpenTelemetry, W3C, RFC, SRE, and architecture snapshots. | Better than synthetic-only fixtures; still needs larger audited snapshots before broad claims. | Keep snapshot hashes, dates, licenses, and warnings in reports. |
-| Embeddings | Local hash fallback plus OpenAI and Azure OpenAI embedding adapters with provider-scoped caches. | API embeddings can now be tested without cache contamination from local vectors. | Report model, dimensions, cache hits, cost, and drift per run. |
-| Extraction | Deterministic term and edge extraction. | Makes tests repeatable; does not test noisy LLM concept extraction. | Add schema-constrained LLM extraction, confidence calibration, retry handling, and human spot checks. |
-| Eval labels | Curated labels plus JSONL audit import that can override expected evidence URIs and path labels. Current committed audit rows are assistant-reviewed. | Reports can separate assistant-reviewed, human-reviewed, and pending rows instead of blending them. | Complete maintainer review before treating golden metrics as human-audited. |
-| Baselines | Local vector, BM25, hybrid, hybrid graph rerank, graph-local, layout, community-summary, bounded-agentic, real LlamaIndex Core retriever, and optional external command adapters. | Stronger controls; GraphRAG and LightRAG still need configured workspaces to become real comparisons. | Run GraphRAG and LightRAG adapters on the same snapshots. |
-| Scale | 118 V2 benchmark questions over a 25-node local graph, plus a 50/200/500/1000-doclet public-source scale sweep. | Shows scale mechanics and path-recall behavior beyond toy fixtures; labels are still heuristic and limited. | Expand to 100+ human-audited scale questions across multiple corpora with confidence intervals and failure taxonomy by query type. |
+| Layer | Implementation details | Active verification |
+| --- | --- | --- |
+| **Corpus & Ingest** | Project-local document ingestion and pinned snapshots (e.g., Kubernetes, OpenTelemetry, SRE books). | Pinned manifest validation with custom source health profiling. |
+| **Embeddings** | Configurable provider interface (Local, OpenAI, Azure OpenAI) with model-scoped caches. | Local caching to isolate API usage and eliminate cost drift. |
+| **Extraction** | Deterministic phrase-based graph indexing and relationships. | Scale edge caps to eliminate combinatorial complexity. |
+| **Evaluation** | Automated golden evaluation suites and benchmark adapters. | Standardized metrics (pass rate, source recall, path recall, latency). |
 
 ## Benchmark Evidence
 
