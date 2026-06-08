@@ -343,7 +343,7 @@ Configuration precedence is CLI flags, environment variables, `tortus.toml`, the
 
 `scripts/run_pytest.py` exists because some macOS Python builds crash when pytest imports `readline` during startup. It only disables that optional import for pytest.
 
-## Problem
+## Why Current RAG Fails at Multi-Hop
 
 Most production RAG systems are strong at retrieving nearby text and weak at preserving relationships between ideas. That creates recurring failures:
 
@@ -754,6 +754,11 @@ tests/
 - V2 reduced mean fanout from the earlier broad traversal while keeping full benchmark path recall. The next algorithmic target is making this selectivity hold on larger, noisier user corpora.
 - The bounded-agentic baseline is strong enough to keep in the benchmark. Tortus has to justify itself with provenance, reproducibility, and predictable budgets, not only raw recall.
 - Curated golden sets are useful for pressure testing, but the numbers should not be treated as research claims until a human maintainer signs off the evidence labels.
+
+## 📚 Deep Dives
+- [Benchmark Methodology & Results](docs/benchmarks.md)
+- [Architecture & Data Model](docs/architecture.md)
+- [Evaluation Framework](docs/evaluation.md)
 
 ## Author
 
