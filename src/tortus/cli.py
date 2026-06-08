@@ -303,10 +303,10 @@ def has_llm_key(settings: Settings) -> bool:
     )
 
 
-def warn_or_confirm_local_quality(settings: Settings, *, yes: bool) -> list[str]:
+def warn_or_confirm_local_quality(settings: Settings, *, project: str, corpus: str, yes: bool) -> tuple[list[str], Settings]:
     """Warn about local fallback when no LLM key is configured."""
     if has_llm_key(settings):
-        return []
+        return [], settings
     message = (
         "No OpenAI/Azure key is configured. Tortus will run with deterministic local "
         "extraction and synthesis, which is useful for demos but rougher on messy docs."
@@ -314,8 +314,19 @@ def warn_or_confirm_local_quality(settings: Settings, *, yes: bool) -> list[str]
     if console.is_interactive and not yes:
         console.print(f"[yellow]{escape(message)}[/yellow]")
         if not typer.confirm("Continue with local fallback?", default=True):
+            if typer.confirm("Would you like to configure your API key now?", default=True):
+                provider = typer.prompt("Select provider (openai or azure)", default="openai")
+                try:
+                    setup(provider=provider)
+                    get_settings.cache_clear()
+                    new_settings = settings_for_solve_project(project, corpus)
+                    console.print("[bold green]API key configured successfully. Running in high-quality LLM mode![/bold green]\n")
+                    return [], new_settings
+                except Exception as e:
+                    console.print(f"[red]Configuration failed: {e}[/red]")
+                    raise typer.Exit(code=1)
             raise typer.Exit(code=1)
-    return [message]
+    return [message], settings
 
 
 def print_source_health_result(source_health: SourceHealth) -> None:
@@ -859,7 +870,7 @@ def run_solve_flow(
     active_project = project or default_solve_project(query_text, sources, demo=demo)
     corpus = DEFAULT_DEMO_CORPUS if demo else "workspace"
     settings = settings_for_solve_project(active_project, corpus)
-    fallback_warnings = warn_or_confirm_local_quality(settings, yes=yes)
+    fallback_warnings, settings = warn_or_confirm_local_quality(settings, project=active_project, corpus=corpus, yes=yes)
     settings.tortus_data_dir.mkdir(parents=True, exist_ok=True)
     settings.tortus_cache_dir.mkdir(parents=True, exist_ok=True)
 
