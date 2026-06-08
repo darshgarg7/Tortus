@@ -1,6 +1,7 @@
 # Tortus: Toroidal Semantic Graph Retrieval
 
 ![Tortus demo terminal output](assets/tortus-demo-terminal.svg)
+![Tortus dashboard demo](assets/tortus-dashboard-demo.gif)
 
 Tortus is a local-first retrieval system for explainable, multi-hop RAG over large and federated knowledge bases.
 
