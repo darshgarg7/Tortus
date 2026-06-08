@@ -54,6 +54,35 @@
         <section class="panel">
           <div class="section-head">
             <div>
+              <p class="eyebrow">Diagnosis</p>
+              <h2>Action plan</h2>
+            </div>
+            <div id="quality-mode" class="status-pill">quality pending</div>
+          </div>
+          <p id="diagnosis" class="answer">Run a query to generate a cited diagnosis.</p>
+          <ol id="action-list" class="action-list">
+            <li>No recommended actions yet.</li>
+          </ol>
+          <div id="missing-evidence" class="warnings"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Sources</p>
+              <h2>Health report</h2>
+            </div>
+          </div>
+          <div id="source-health" class="metric-grid">
+            <p class="muted">Source health appears after a query.</p>
+          </div>
+        </section>
+      </section>
+
+      <section class="content-grid">
+        <section class="panel">
+          <div class="section-head">
+            <div>
               <p class="eyebrow">Evidence path</p>
               <h2>Reasoning hops</h2>
             </div>

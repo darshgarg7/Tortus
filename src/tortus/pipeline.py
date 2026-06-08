@@ -5,10 +5,12 @@ from pathlib import Path
 from .config import Settings
 from .corpus import chunk_corpus, load_builtin_corpus, write_snapshot
 from .embeddings import build_embedding_provider
-from .extract import extract_graph
 from .graph_store import GraphStore
 from .ingest import WorkspaceIngestResult, ingest_workspace, load_snapshot_documents
+from .llm import quality_mode
+from .llm_extract import extract_graph_with_settings
 from .models import ConceptNode, Document
+from .synthesis import build_action_plan_enhancer
 from .torus import assign_torus
 from .traversal import QueryEngine
 from .vector import build_vector_index, load_vector_index, vector_index_path
@@ -51,7 +53,7 @@ def build_index(settings: Settings, corpus: str | None = None) -> dict[str, int]
     corpus = corpus or settings.tortus_corpus
     documents = load_documents(settings, corpus)
     chunks = chunk_corpus(documents)
-    nodes, edges = extract_graph(chunks)
+    nodes, edges = extract_graph_with_settings(chunks, settings)
     embeddings = build_embedding_provider(settings)
     node_vectors = embeddings.embed([node.label + "\n" + node.text for node in nodes])
     nodes = assign_torus(nodes, node_vectors)
@@ -84,7 +86,13 @@ def load_engine(settings: Settings) -> QueryEngine:
     graph = GraphStore(paths["graph"])
     index = load_vector_index(settings.tortus_vector_backend, paths["index"])
     embeddings = build_embedding_provider(settings)
-    return QueryEngine(graph=graph, index=index, embeddings=embeddings)
+    return QueryEngine(
+        graph=graph,
+        index=index,
+        embeddings=embeddings,
+        action_plan_enhancer=build_action_plan_enhancer(settings),
+        quality_mode=quality_mode(settings, "synthesis"),
+    )
 
 
 def load_nodes(settings: Settings) -> list[ConceptNode]:

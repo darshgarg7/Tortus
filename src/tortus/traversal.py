@@ -1,5 +1,6 @@
 """Bounded query traversal, diagnostics, and evidence-grounded synthesis."""
 
+import asyncio
 import logging
 import time
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ from .models import (
     RetrievalTrace,
     SearchHit,
     SemanticEdge,
+    SourceHealth,
     TraversalPolicy,
 )
 from .sharding import ToroidalShardSimulator
@@ -71,11 +73,26 @@ class SynthesizedAnswer:
     """An extractive answer plus support telemetry."""
 
     answer: str
+    diagnosis: str
+    root_cause_path: list[str]
+    recommended_actions: list[str]
+    missing_evidence: list[str]
+    quality_mode: str
     evidence: list[EvidenceSpan]
     confidence: float
     lexical_support: int
     claims: list[AnswerClaim]
     unsupported_claims: list[AnswerClaim]
+
+
+class ActionPlanEnhancer(Protocol):
+    """Optional LLM-backed enhancer for diagnosis and action-plan fields."""
+
+    quality_mode: str
+
+    def enhance(self, query: str, synthesized: SynthesizedAnswer) -> SynthesizedAnswer:
+        """Return an enhanced synthesized answer."""
+        ...
 
 
 class QueryEngine:
@@ -86,11 +103,15 @@ class QueryEngine:
         graph: GraphStore,
         index: SearchableIndex,
         embeddings: EmbeddingProvider,
+        action_plan_enhancer: ActionPlanEnhancer | None = None,
+        quality_mode: str = "deterministic-local",
     ) -> None:
         """Initialize the query engine dependencies."""
         self.graph = graph
         self.index = index
         self.embeddings = embeddings
+        self.action_plan_enhancer = action_plan_enhancer
+        self.quality_mode = quality_mode
 
     def answer(self, query: str, policy: TraversalPolicy | None = None) -> AnswerResult:
         """Retrieve evidence paths and synthesize a source-grounded answer."""
@@ -261,7 +282,14 @@ class QueryEngine:
                 break
 
         elapsed_ms = (time.perf_counter() - started) * 1000
-        synthesized = synthesize_evidence_answer(query, best_hits[:8], evidence)
+        synthesized = synthesize_evidence_answer(
+            query,
+            best_hits[:8],
+            evidence,
+            quality_mode=self.quality_mode,
+        )
+        if self.action_plan_enhancer is not None:
+            synthesized = self.action_plan_enhancer.enhance(query, synthesized)
         reported_hops = select_reasoning_hops(
             hops,
             query_terms=query_terms,
@@ -281,6 +309,7 @@ class QueryEngine:
             warnings.append("Traversal reached the configured portal-hop budget.")
 
         all_nodes = list(nodes_by_id.values())
+        source_health = source_health_for_nodes(all_nodes)
         shard_simulator = ToroidalShardSimulator()
         visited_nodes = [node for node in all_nodes if node.id in visited]
         vector_baseline = BaselineComparison(
@@ -317,6 +346,12 @@ class QueryEngine:
         )
         return AnswerResult(
             answer=synthesized.answer,
+            diagnosis=synthesized.diagnosis,
+            root_cause_path=synthesized.root_cause_path,
+            recommended_actions=synthesized.recommended_actions,
+            missing_evidence=synthesized.missing_evidence,
+            quality_mode=synthesized.quality_mode,
+            citations=synthesized.evidence[:10],
             confidence=synthesized.confidence,
             reasoning_path=reported_hops,
             evidence=synthesized.evidence[:10],
@@ -336,9 +371,18 @@ class QueryEngine:
             ),
             warnings=warnings,
             baseline_comparison=[vector_baseline],
+            source_health=source_health,
             trace=trace,
             diagnostics=diagnostics,
         )
+
+    async def async_answer(
+        self,
+        query: str,
+        policy: TraversalPolicy | None = None,
+    ) -> AnswerResult:
+        """Run answer generation without blocking an async web handler."""
+        return await asyncio.to_thread(self.answer, query, policy)
 
 
 def attach_hit_diagnostics(
@@ -604,9 +648,11 @@ def synthesize_evidence_answer(
     query: str,
     hits: list[SearchHit],
     evidence: list[EvidenceSpan],
+    quality_mode: str = "deterministic-local",
 ) -> SynthesizedAnswer:
     """Build a concise extractive answer using only supported evidence spans."""
     if token_set(query).intersection(OUT_OF_SCOPE_INTENT_TERMS):
+        missing = missing_evidence_for_query(query, [], 0)
         unsupported = [
             AnswerClaim(
                 text="I could not find enough source-backed evidence to answer this query.",
@@ -615,6 +661,14 @@ def synthesize_evidence_answer(
         ]
         return SynthesizedAnswer(
             answer="I could not find enough source-backed evidence to answer this query.",
+            diagnosis="Tortus could not ground this question in the indexed sources.",
+            root_cause_path=[],
+            recommended_actions=[
+                "Add source documents that directly describe the system, incident, "
+                "and intended fix."
+            ],
+            missing_evidence=missing,
+            quality_mode=quality_mode,
             evidence=[],
             confidence=0.0,
             lexical_support=0,
@@ -623,6 +677,7 @@ def synthesize_evidence_answer(
         )
     supported = [item for item in rank_evidence(query, dedupe_evidence(evidence)) if item[0] > 0]
     if not supported:
+        missing = missing_evidence_for_query(query, [], 0)
         unsupported = [
             AnswerClaim(
                 text="I could not find enough source-backed evidence to answer this query.",
@@ -631,6 +686,14 @@ def synthesize_evidence_answer(
         ]
         return SynthesizedAnswer(
             answer="I could not find enough source-backed evidence to answer this query.",
+            diagnosis="Tortus could not find enough source-backed overlap to diagnose the issue.",
+            root_cause_path=[],
+            recommended_actions=[
+                "Add the incident timeline, design note, runbook, or owner notes "
+                "that mention the affected terms."
+            ],
+            missing_evidence=missing,
+            quality_mode=quality_mode,
             evidence=[],
             confidence=0.0,
             lexical_support=0,
@@ -640,6 +703,7 @@ def synthesize_evidence_answer(
     selected = [span for _, span in supported[:6]]
     sentences = select_supporting_sentences(query, selected)
     if not sentences:
+        missing = missing_evidence_for_query(query, selected, 0)
         unsupported = [
             AnswerClaim(
                 text="I could not find enough source-backed evidence to answer this query.",
@@ -648,6 +712,14 @@ def synthesize_evidence_answer(
         ]
         return SynthesizedAnswer(
             answer="I could not find enough source-backed evidence to answer this query.",
+            diagnosis="The retrieved sources were not specific enough to support a diagnosis.",
+            root_cause_path=[],
+            recommended_actions=[
+                "Add more specific source text that names the failure mode, affected "
+                "component, and attempted fix."
+            ],
+            missing_evidence=missing,
+            quality_mode=quality_mode,
             evidence=[],
             confidence=0.0,
             lexical_support=0,
@@ -664,8 +736,14 @@ def synthesize_evidence_answer(
         f"This answer is grounded in {source_count} source(s)."
     )
     claims = claims_for_answer(answer, selected, query)
+    missing = missing_evidence_for_query(query, selected, lexical_support)
     return SynthesizedAnswer(
         answer=answer,
+        diagnosis=diagnosis_for_evidence(sentences, selected),
+        root_cause_path=root_cause_path_for_hits(hits, selected),
+        recommended_actions=recommended_actions_for_evidence(query, selected),
+        missing_evidence=missing,
+        quality_mode=quality_mode,
         evidence=selected,
         confidence=confidence,
         lexical_support=lexical_support,
@@ -736,6 +814,127 @@ def dedupe_evidence(spans: list[EvidenceSpan]) -> list[EvidenceSpan]:
             seen.add(key)
             unique.append(span)
     return unique
+
+
+def diagnosis_for_evidence(sentences: list[str], evidence: list[EvidenceSpan]) -> str:
+    """Return a compact diagnosis from selected evidence sentences."""
+    if not sentences:
+        return "Tortus found evidence, but not enough sentence-level support for a diagnosis."
+    source_count = len({span.uri for span in evidence})
+    return (
+        " ".join(sentences[:2]).strip()
+        + f" This diagnosis is grounded in {source_count} cited source(s)."
+    )
+
+
+def root_cause_path_for_hits(hits: list[SearchHit], evidence: list[EvidenceSpan]) -> list[str]:
+    """Return a compact root-cause path label list for user-facing output."""
+    labels: list[str] = []
+    for hit in hits:
+        if hit.label and hit.label not in labels:
+            labels.append(hit.label)
+        if len(labels) >= 4:
+            break
+    for span in evidence:
+        uri = span.uri
+        if uri not in labels:
+            labels.append(uri)
+        if len(labels) >= 6:
+            break
+    return labels
+
+
+def recommended_actions_for_evidence(query: str, evidence: list[EvidenceSpan]) -> list[str]:
+    """Derive conservative next actions from cited evidence."""
+    joined = " ".join(span.text for span in evidence).lower()
+    query_terms = token_set(query)
+    actions: list[str] = []
+    if {"token", "tokens", "audience", "auth", "authentication"}.intersection(query_terms) or {
+        "token",
+        "audience",
+        "authentication",
+    }.intersection(token_set(joined)):
+        actions.append(
+            "Verify token audience, issuer, and service-boundary expectations for the "
+            "affected path."
+        )
+    if {"trace", "tracing", "traceparent", "opentelemetry"}.intersection(query_terms) or {
+        "trace",
+        "traceparent",
+        "opentelemetry",
+    }.intersection(token_set(joined)):
+        actions.append(
+            "Add or rerun trace-context propagation checks across retries and service boundaries."
+        )
+    if "retry" in query_terms or "retry" in joined:
+        actions.append("Audit retry/failover code paths for dropped headers or recreated requests.")
+    if "metrics" in joined or "dashboard" in joined:
+        actions.append("Correlate the cited metrics or dashboards with the incident timeline.")
+    actions.append(
+        "Turn the cited evidence path into a ticket or runbook update for the owning team."
+    )
+    deduped: list[str] = []
+    for action in actions:
+        if action not in deduped:
+            deduped.append(action)
+    return deduped[:5]
+
+
+def missing_evidence_for_query(
+    query: str,
+    evidence: list[EvidenceSpan],
+    lexical_support: int,
+) -> list[str]:
+    """Return missing-context warnings that keep the answer honest."""
+    missing: list[str] = []
+    source_count = len({span.uri for span in evidence})
+    if source_count < 2:
+        missing.append("Add at least one independent source so Tortus can verify the path.")
+    if lexical_support < 3:
+        terms = ", ".join(sorted(token_set(query))[:6])
+        missing.append(f"Add source text that explicitly mentions the query terms: {terms}.")
+    if not evidence:
+        missing.append(
+            "Add an incident note, design note, runbook, or support ticket for this case."
+        )
+    return missing
+
+
+def source_health_for_nodes(nodes: list[ConceptNode]) -> SourceHealth:
+    """Estimate source health from persisted graph-node metadata."""
+    document_ids = {node.document_id for node in nodes}
+    source_types: dict[str, int] = {}
+    warnings: set[str] = set()
+    normalized_hashes: dict[str, int] = {}
+    empty_documents: set[str] = set()
+    for node in nodes:
+        source_metadata = node.metadata.get("source_metadata", {})
+        if isinstance(source_metadata, dict):
+            source_type = str(source_metadata.get("source_type", "builtin"))
+            source_types[source_type] = source_types.get(source_type, 0) + 1
+            for warning in source_metadata.get("warnings", []):
+                warnings.add(str(warning))
+            normalized_sha = str(source_metadata.get("normalized_sha256", ""))
+            if normalized_sha:
+                normalized_hashes[normalized_sha] = normalized_hashes.get(normalized_sha, 0) + 1
+        if not node.text.strip():
+            empty_documents.add(node.document_id)
+    duplicate_documents = sum(1 for count in normalized_hashes.values() if count > 1)
+    penalty = (
+        min(0.35, 0.05 * len(warnings))
+        + min(0.25, 0.08 * len(empty_documents))
+        + min(0.20, 0.04 * duplicate_documents)
+    )
+    return SourceHealth(
+        documents=len(document_ids),
+        chunks=len(nodes),
+        supported_sources=len(document_ids),
+        empty_documents=len(empty_documents),
+        duplicate_documents=duplicate_documents,
+        warnings=sorted(warnings)[:20],
+        source_types=source_types or {"builtin": len(nodes)},
+        quality_score=max(0.0, 1.0 - penalty),
+    )
 
 
 def estimate_tokens(query: str, evidence: list[EvidenceSpan]) -> int:

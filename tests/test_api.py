@@ -32,12 +32,21 @@ def test_api_graphql_dashboard_and_summary(tmp_path) -> None:
                 query($q: String!) {
                   answer(query: $q) {
                     answer
+                    diagnosis
+                    recommendedActions
+                    missingEvidence
+                    qualityMode
                     confidence
                     budget {
                       nodesVisited
                       candidatesConsidered
                       prunedEdges
                       lexicalSupport
+                    }
+                    sourceHealth {
+                      documents
+                      chunks
+                      qualityScore
                     }
                     reasoningPath {
                       fromNode
@@ -69,6 +78,10 @@ def test_api_graphql_dashboard_and_summary(tmp_path) -> None:
         assert "errors" not in payload
         answer = payload["data"]["answer"]
         assert answer["confidence"] > 0
+        assert answer["diagnosis"]
+        assert answer["recommendedActions"]
+        assert answer["qualityMode"] == "deterministic-local"
+        assert answer["sourceHealth"]["documents"] > 0
         assert answer["evidence"]
         assert answer["trace"]["seedHits"]
         assert "prunedCandidates" in answer["trace"]
@@ -81,4 +94,7 @@ def test_api_graphql_dashboard_and_summary(tmp_path) -> None:
         assert json_response.status_code == 200
         json_payload = json_response.json()
         assert json_payload["trace"]["seed_hits"]
+        assert json_payload["diagnosis"]
+        assert json_payload["recommended_actions"]
+        assert json_payload["source_health"]["documents"] > 0
         assert "pruned_candidates" in json_payload["trace"]

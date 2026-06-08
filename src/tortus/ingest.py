@@ -19,7 +19,7 @@ import httpx
 
 from .config import Settings
 from .corpus import chunk_corpus, write_snapshot
-from .models import Document
+from .models import Document, SourceHealth
 
 SUPPORTED_EXTENSIONS = {".md", ".mdx", ".txt", ".html", ".htm", ".pdf"}
 DEFAULT_USER_AGENT = "tortus-rag/0.1 (+https://github.com/darshgarg7/Tortus)"
@@ -44,6 +44,7 @@ class WorkspaceIngestResult:
     out_dir: Path
     manifest_path: Path
     warnings: list[str]
+    source_health: SourceHealth
 
 
 class TextHTMLParser(html.parser.HTMLParser):
@@ -98,13 +99,28 @@ def ingest_workspace(
     warnings: list[str] = []
     documents: list[Document] = []
     source_records: list[dict[str, Any]] = []
+    unsupported_sources = 0
     for source in resolved_sources:
-        for ingested in ingest_one_source(source, raw_dir=raw_dir, refresh=refresh):
+        unsupported = unsupported_files_for_source(source)
+        unsupported_sources += len(unsupported)
+        for path in unsupported[:12]:
+            warnings.append(f"Unsupported source skipped: {path}")
+        ingested_sources = ingest_one_source(source, raw_dir=raw_dir, refresh=refresh)
+        if not ingested_sources and not unsupported:
+            warnings.append(f"No supported documents found in source: {source}")
+        for ingested in ingested_sources:
             documents.append(ingested.document)
             source_records.append(ingested.metadata)
             warnings.extend(str(item) for item in ingested.metadata.get("warnings", []))
 
     chunks = chunk_corpus(documents)
+    source_health = build_source_health(
+        documents,
+        len(chunks),
+        source_records,
+        warnings,
+        unsupported_sources=unsupported_sources,
+    )
     write_snapshot(documents, chunks, out_dir)
     manifest_payload = {
         "schema_version": 1,
@@ -113,6 +129,7 @@ def ingest_workspace(
         "documents": len(documents),
         "chunks": len(chunks),
         "sources": source_records,
+        "source_health": source_health.model_dump(mode="json"),
     }
     manifest_path = out_dir / "snapshot_manifest.json"
     manifest_path.write_text(json.dumps(manifest_payload, indent=2) + "\n", encoding="utf-8")
@@ -122,6 +139,7 @@ def ingest_workspace(
         out_dir=out_dir,
         manifest_path=manifest_path,
         warnings=warnings,
+        source_health=source_health,
     )
 
 
@@ -152,6 +170,22 @@ def iter_supported_files(root: Path) -> Iterable[Path]:
     for path in root.rglob("*"):
         if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS:
             yield path
+
+
+def unsupported_files_for_source(source: str) -> list[Path]:
+    """Return unsupported local files under a source path."""
+    if is_url(source):
+        return []
+    path = Path(source).expanduser()
+    if path.is_dir():
+        return [
+            file_path
+            for file_path in sorted(path.rglob("*"))
+            if file_path.is_file() and file_path.suffix.lower() not in SUPPORTED_EXTENSIONS
+        ]
+    if path.is_file() and path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+        return [path]
+    return []
 
 
 def ingest_local_file(path: Path, *, raw_dir: Path) -> IngestedSource:
@@ -366,7 +400,7 @@ def pdf_to_text(raw_bytes: bytes, *, warnings: list[str]) -> str:
         pypdf = importlib.import_module("pypdf")
         pdf_reader = pypdf.PdfReader
     except ImportError:
-        warnings.append("PDF extraction requires installing tortus-rag[ingest].")
+        warnings.append("PDF extraction dependency is unavailable; reinstall tortus-rag.")
         return ""
 
     try:
@@ -404,6 +438,48 @@ def read_manifest_sources(path: Path) -> list[str]:
     return sources
 
 
+def build_source_health(
+    documents: list[Document],
+    chunks: int,
+    source_records: list[dict[str, Any]],
+    warnings: list[str],
+    *,
+    unsupported_sources: int,
+) -> SourceHealth:
+    """Build a source-health report from ingested documents and source metadata."""
+    source_types: dict[str, int] = {}
+    normalized_hashes: dict[str, int] = {}
+    empty_documents = 0
+    for record in source_records:
+        source_type = str(record.get("source_type", "unknown"))
+        source_types[source_type] = source_types.get(source_type, 0) + 1
+        normalized_sha = str(record.get("normalized_sha256", ""))
+        if normalized_sha:
+            normalized_hashes[normalized_sha] = normalized_hashes.get(normalized_sha, 0) + 1
+    for document in documents:
+        if not document.text.strip():
+            empty_documents += 1
+    duplicate_documents = sum(1 for count in normalized_hashes.values() if count > 1)
+    unique_warnings = sorted(set(warnings))
+    penalty = (
+        min(0.35, 0.05 * len(unique_warnings))
+        + min(0.25, 0.08 * empty_documents)
+        + min(0.20, 0.04 * duplicate_documents)
+        + min(0.20, 0.03 * unsupported_sources)
+    )
+    return SourceHealth(
+        documents=len(documents),
+        chunks=chunks,
+        supported_sources=len(source_records),
+        unsupported_sources=unsupported_sources,
+        empty_documents=empty_documents,
+        duplicate_documents=duplicate_documents,
+        warnings=unique_warnings[:40],
+        source_types=source_types,
+        quality_score=max(0.0, 1.0 - penalty),
+    )
+
+
 def load_snapshot_documents(corpus_dir: Path) -> list[Document]:
     """Load persisted documents from a Tortus corpus snapshot."""
     path = corpus_dir / "documents.json"
@@ -411,6 +487,15 @@ def load_snapshot_documents(corpus_dir: Path) -> list[Document]:
         raise FileNotFoundError(f"workspace corpus snapshot not found: {path}")
     payload = json.loads(path.read_text(encoding="utf-8"))
     return [Document.model_validate(item) for item in payload]
+
+
+def load_snapshot_source_health(corpus_dir: Path) -> SourceHealth:
+    """Load source-health metadata for a persisted workspace snapshot."""
+    manifest_path = corpus_dir / "snapshot_manifest.json"
+    if not manifest_path.exists():
+        return SourceHealth()
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return SourceHealth.model_validate(payload.get("source_health", {}))
 
 
 def is_url(value: str) -> bool:

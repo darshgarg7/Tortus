@@ -17,6 +17,7 @@ def test_workspace_ingests_local_markdown_html_and_text(tmp_path) -> None:
         encoding="utf-8",
     )
     (docs / "note.txt").write_text("OpenTelemetry context propagation matters.", encoding="utf-8")
+    (docs / "spreadsheet.xlsx").write_bytes(b"not supported yet")
 
     settings = Settings(
         TORTUS_DATA_DIR=tmp_path / "data",
@@ -28,6 +29,8 @@ def test_workspace_ingests_local_markdown_html_and_text(tmp_path) -> None:
     assert isinstance(result, WorkspaceIngestResult)
     assert result.documents == 3
     assert result.chunks >= 3
+    assert result.source_health.unsupported_sources == 1
+    assert "Unsupported source skipped" in " ".join(result.source_health.warnings)
     assert result.manifest_path.exists()
     documents = load_snapshot_documents(result.out_dir)
     assert {document.metadata["source_type"] for document in documents} == {"file"}

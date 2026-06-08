@@ -18,7 +18,14 @@ from strawberry.types import Info
 
 from .config import Settings, get_settings
 from .eval import EvalReport
-from .models import ConceptNode, ReasoningHop, RetrievalTrace, SemanticEdge, TraversalPolicy
+from .models import (
+    ConceptNode,
+    ReasoningHop,
+    RetrievalTrace,
+    SemanticEdge,
+    SourceHealth,
+    TraversalPolicy,
+)
 from .pipeline import data_paths, load_engine
 from .traversal import QueryEngine
 
@@ -165,15 +172,37 @@ class RetrievalTraceType:
 
 
 @strawberry.type
+class SourceHealthType:
+    """GraphQL representation of source-health diagnostics."""
+
+    documents: int
+    chunks: int
+    supported_sources: int
+    unsupported_sources: int
+    empty_documents: int
+    duplicate_documents: int
+    warnings: list[str]
+    quality_score: float
+    source_types: list[ScoreComponentType]
+
+
+@strawberry.type
 class AnswerType:
     """GraphQL answer payload with evidence and retrieval telemetry."""
 
     answer: str
+    diagnosis: str
+    root_cause_path: list[str]
+    recommended_actions: list[str]
+    missing_evidence: list[str]
+    quality_mode: str
+    citations: list[EvidenceType]
     confidence: float
     budget: BudgetType
     warnings: list[str]
     reasoning_path: list[HopType]
     evidence: list[EvidenceType]
+    source_health: SourceHealthType
     trace: RetrievalTraceType
 
 
@@ -219,6 +248,12 @@ class Query:
         )
         return AnswerType(
             answer=result.answer,
+            diagnosis=result.diagnosis,
+            root_cause_path=result.root_cause_path,
+            recommended_actions=result.recommended_actions,
+            missing_evidence=result.missing_evidence,
+            quality_mode=result.quality_mode,
+            citations=[EvidenceType(**span.model_dump()) for span in result.citations],
             confidence=result.confidence,
             budget=BudgetType(**result.budget.model_dump()),
             warnings=result.warnings,
@@ -227,6 +262,7 @@ class Query:
                 for hop in result.reasoning_path
             ],
             evidence=[EvidenceType(**span.model_dump()) for span in result.evidence],
+            source_health=to_source_health_type(result.source_health),
             trace=to_trace_type(result.trace),
         )
 
@@ -275,6 +311,29 @@ def score_components_payload(components: dict[str, float]) -> list[ScoreComponen
         ScoreComponentType(key=key, value=value)
         for key, value in sorted(components.items())
     ]
+
+
+def source_type_payload(source_types: dict[str, int]) -> list[ScoreComponentType]:
+    """Convert source-type counts into reusable key/value rows."""
+    return [
+        ScoreComponentType(key=key, value=float(value))
+        for key, value in sorted(source_types.items())
+    ]
+
+
+def to_source_health_type(source_health: SourceHealth) -> SourceHealthType:
+    """Convert source health into a GraphQL DTO."""
+    return SourceHealthType(
+        documents=source_health.documents,
+        chunks=source_health.chunks,
+        supported_sources=source_health.supported_sources,
+        unsupported_sources=source_health.unsupported_sources,
+        empty_documents=source_health.empty_documents,
+        duplicate_documents=source_health.duplicate_documents,
+        warnings=source_health.warnings,
+        quality_score=source_health.quality_score,
+        source_types=source_type_payload(source_health.source_types),
+    )
 
 
 def to_hop_type(hop: ReasoningHop) -> HopType:
@@ -479,7 +538,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             explain_hops=True,
         )
         engine: QueryEngine = fastapi_app.state.engine
-        result = engine.answer(payload.query, policy=policy)
+        result = await engine.async_answer(payload.query, policy=policy)
         return cast(dict[str, object], result.model_dump(mode="json"))
 
     return fastapi_app

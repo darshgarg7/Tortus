@@ -12,8 +12,9 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from .api import PACKAGE_DIR
 from .config import Settings
+
+PACKAGE_DIR = Path(__file__).resolve().parent
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,15 @@ def run_doctor(settings: Settings) -> list[DoctorCheck]:
     except importlib.metadata.PackageNotFoundError:
         checks.append(DoctorCheck("distribution", False, "tortus-rag distribution not installed"))
 
+    import_ms, import_detail = measure_cli_import_ms()
+    checks.append(
+        DoctorCheck(
+            "cold start import",
+            import_ms is not None,
+            f"{import_ms:.1f} ms" if import_ms is not None else import_detail,
+        )
+    )
+
     for label, path in {
         "template asset": PACKAGE_DIR / "templates" / "index.html",
         "static asset": PACKAGE_DIR / "static" / "app.js",
@@ -41,7 +51,17 @@ def run_doctor(settings: Settings) -> list[DoctorCheck]:
     }.items():
         checks.append(DoctorCheck(label, path.exists(), str(path)))
 
-    for package in ("pypdf", "trafilatura", "bs4", "faiss", "graphrag", "llama_index", "lightrag"):
+    for package in (
+        "duckdb",
+        "fastapi",
+        "jinja2",
+        "strawberry",
+        "uvicorn",
+        "faiss",
+        "graphrag",
+        "llama_index",
+        "lightrag",
+    ):
         checks.append(
             DoctorCheck(
                 f"optional dependency {package}",
@@ -59,6 +79,28 @@ def run_doctor(settings: Settings) -> list[DoctorCheck]:
     except OSError as exc:
         checks.append(DoctorCheck("data path", False, str(exc)))
     return checks
+
+
+def measure_cli_import_ms() -> tuple[float | None, str]:
+    """Measure import time for the CLI module in a fresh Python process."""
+    code = (
+        "import time; "
+        "start=time.perf_counter(); "
+        "import tortus.cli; "
+        "print((time.perf_counter() - start) * 1000)"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return None, completed.stderr.strip() or completed.stdout.strip()
+    try:
+        return float(completed.stdout.strip()), ""
+    except ValueError:
+        return None, completed.stdout.strip()
 
 
 def run_release_check(project_root: Path) -> list[str]:
@@ -87,6 +129,7 @@ def run_release_check(project_root: Path) -> list[str]:
         run([sys.executable, "-m", "venv", str(venv)], cwd=project_root)
         python = venv_python(venv)
         env = os.environ.copy()
+        env["HOME"] = str(temp_root / "home")
         env["TORTUS_DATA_DIR"] = str(temp_root / "data")
         env["TORTUS_CACHE_DIR"] = str(temp_root / "cache")
         run([str(python), "-m", "pip", "install", "--upgrade", "pip"], cwd=project_root)
@@ -94,18 +137,22 @@ def run_release_check(project_root: Path) -> list[str]:
         run([str(python), "-c", "import tortus; print(tortus.__version__)"], cwd=project_root)
         tortus = venv_bin(venv, "tortus")
         run([str(tortus), "--help"], cwd=project_root, env=env)
-        run([str(tortus), "ingest", "--corpus", "engineering"], cwd=project_root, env=env)
-        run([str(tortus), "index", "--corpus", "engineering"], cwd=project_root, env=env)
         run(
             [
                 str(tortus),
-                "query",
-                "How did token migration connect authentication and tracing?",
+                "demo",
+                "--project",
+                "release-demo",
+                "--yes",
             ],
             cwd=project_root,
             env=env,
         )
-        run([str(tortus), "serve", "--dry-run"], cwd=project_root, env=env)
+        run(
+            [str(python), "-m", "pip", "install", f"{wheels[-1]}[api]"],
+            cwd=project_root,
+        )
+        run([str(tortus), "serve", "--last", "--dry-run"], cwd=project_root, env=env)
     messages.append("installed wheel and smoke-tested tortus CLI")
     return messages
 
