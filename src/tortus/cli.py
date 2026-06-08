@@ -172,10 +172,17 @@ def load_api_runtime() -> tuple[Callable[..., Any], Any]:
 
         from .api import create_app
     except ImportError as exc:
+        package_install = escape('pip install "tortus-rag[api]"')
+        editable_install = escape('python -m pip install -e ".[api]"')
         print_message_panel(
             "API Extra Required",
-            'Dashboard commands require the optional API extra:\n\n'
-            '[bold cyan]pip install "tortus-rag[api]"[/bold cyan]',
+            "Dashboard/API commands need the optional API extra.\n\n"
+            "[bold]Installed package:[/bold]\n"
+            f"[bold cyan]{package_install}[/bold cyan]\n\n"
+            "[bold]Working from this repo:[/bold]\n"
+            f"[bold cyan]{editable_install}[/bold cyan]\n\n"
+            "[bold]Then retry:[/bold]\n"
+            "[bold cyan]tortus serve --dry-run[/bold cyan]",
             style="yellow",
         )
         raise typer.Exit(code=1) from exc

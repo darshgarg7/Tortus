@@ -1,3 +1,5 @@
+import pytest
+
 from tortus.baselines import run_strategy
 from tortus.config import Settings
 from tortus.models import TraversalPolicy
@@ -73,6 +75,7 @@ def test_lightrag_external_baseline_skips_without_command(tmp_path) -> None:
 
 
 def test_llamaindex_external_baseline_runs_with_core_package(tmp_path) -> None:
+    pytest.importorskip("llama_index.core")
     settings = Settings(
         TORTUS_DATA_DIR=tmp_path / "data",
         TORTUS_CACHE_DIR=tmp_path / "cache",

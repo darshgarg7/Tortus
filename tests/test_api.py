@@ -9,6 +9,7 @@ def test_api_graphql_dashboard_and_summary(tmp_path) -> None:
         TORTUS_DATA_DIR=tmp_path / "data",
         TORTUS_CACHE_DIR=tmp_path / "cache",
         TORTUS_CORPUS="engineering",
+        TORTUS_SYNTHESIS_PROVIDER="local",
     )
     with TestClient(create_app(settings)) as client:
         dashboard = client.get("/")
