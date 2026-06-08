@@ -303,7 +303,13 @@ def has_llm_key(settings: Settings) -> bool:
     )
 
 
-def warn_or_confirm_local_quality(settings: Settings, *, project: str, corpus: str, yes: bool) -> tuple[list[str], Settings]:
+def warn_or_confirm_local_quality(
+    settings: Settings,
+    *,
+    project: str,
+    corpus: str,
+    yes: bool,
+) -> tuple[list[str], Settings]:
     """Warn about local fallback when no LLM key is configured."""
     if has_llm_key(settings):
         return [], settings
@@ -320,11 +326,14 @@ def warn_or_confirm_local_quality(settings: Settings, *, project: str, corpus: s
                     setup(provider=provider)
                     get_settings.cache_clear()
                     new_settings = settings_for_solve_project(project, corpus)
-                    console.print("[bold green]API key configured successfully. Running in high-quality LLM mode![/bold green]\n")
+                    console.print(
+                        "[bold green]API key configured successfully. "
+                        "Running in high-quality LLM mode![/bold green]\n"
+                    )
                     return [], new_settings
                 except Exception as e:
                     console.print(f"[red]Configuration failed: {e}[/red]")
-                    raise typer.Exit(code=1)
+                    raise typer.Exit(code=1) from e
             raise typer.Exit(code=1)
     return [message], settings
 
@@ -870,7 +879,12 @@ def run_solve_flow(
     active_project = project or default_solve_project(query_text, sources, demo=demo)
     corpus = DEFAULT_DEMO_CORPUS if demo else "workspace"
     settings = settings_for_solve_project(active_project, corpus)
-    fallback_warnings, settings = warn_or_confirm_local_quality(settings, project=active_project, corpus=corpus, yes=yes)
+    fallback_warnings, settings = warn_or_confirm_local_quality(
+        settings,
+        project=active_project,
+        corpus=corpus,
+        yes=yes,
+    )
     settings.tortus_data_dir.mkdir(parents=True, exist_ok=True)
     settings.tortus_cache_dir.mkdir(parents=True, exist_ok=True)
 
