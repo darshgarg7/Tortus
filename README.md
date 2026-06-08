@@ -21,7 +21,7 @@ In an incident review, for example, the evidence might be split across an auth m
 
 Tortus is built for that gap. It tries to answer "why did this happen?" or "what should we fix?" by returning the evidence path across documents, not only a list of matching chunks.
 
-### Features & Architecture
+## Features & Architecture
 
 Tortus is a complete, package-distributable RAG engine designed to run locally or integrate as a service:
 
