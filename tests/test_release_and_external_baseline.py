@@ -11,6 +11,8 @@ def test_doctor_sees_packaged_dashboard_assets(tmp_path) -> None:
     assert checks["template asset"].ok
     assert checks["static asset"].ok
     assert checks["typed marker"].ok
+    assert checks["cold start import"].ok
+    assert "ms" in checks["cold start import"].detail
     assert checks["data path"].ok
 
 

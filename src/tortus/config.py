@@ -10,12 +10,22 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_CONFIG_NAME = "tortus.toml"
+USER_CONFIG_PATH = Path.home() / ".tortus" / "config.toml"
 
 CONFIG_KEY_TO_FIELD = {
+    "azure_openai_api_key": "azure_openai_api_key",
+    "azure_openai_api_version": "azure_openai_api_version",
+    "azure_openai_deployment": "azure_openai_deployment",
+    "azure_openai_embedding_deployment": "azure_openai_embedding_deployment",
+    "azure_openai_endpoint": "azure_openai_endpoint",
     "corpus": "tortus_corpus",
     "embedding_provider": "tortus_embedding_provider",
     "embedding_model": "tortus_embedding_model",
     "embedding_dimensions": "tortus_embedding_dimensions",
+    "extraction_provider": "tortus_extraction_provider",
+    "openai_api_key": "openai_api_key",
+    "openai_base_url": "openai_base_url",
+    "synthesis_provider": "tortus_synthesis_provider",
     "vector_backend": "tortus_vector_backend",
     "data_dir": "tortus_data_dir",
     "cache_dir": "tortus_cache_dir",
@@ -47,6 +57,8 @@ class Settings(BaseSettings):
 
     tortus_llm_model: str = Field(default="gpt-4.1", alias="TORTUS_LLM_MODEL")
     tortus_corpus: str = Field(default="public-engineering", alias="TORTUS_CORPUS")
+    tortus_extraction_provider: str = Field(default="auto", alias="TORTUS_EXTRACTION_PROVIDER")
+    tortus_synthesis_provider: str = Field(default="auto", alias="TORTUS_SYNTHESIS_PROVIDER")
     tortus_embedding_provider: str = Field(default="local", alias="TORTUS_EMBEDDING_PROVIDER")
     tortus_embedding_model: str = Field(
         default="text-embedding-3-large",
@@ -64,7 +76,10 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Return runtime settings with env values overriding tortus.toml values."""
-    project_values = project_config_values(project_config_path())
+    project_values = {
+        **project_config_values(USER_CONFIG_PATH),
+        **project_config_values(project_config_path()),
+    }
     env_aliases = configured_env_aliases()
     filtered_values = {
         key: value
@@ -83,6 +98,8 @@ def settings_with_overrides(
     vector_backend: str | None = None,
     embedding_provider: str | None = None,
     embedding_model: str | None = None,
+    extraction_provider: str | None = None,
+    synthesis_provider: str | None = None,
 ) -> Settings:
     """Return settings updated with explicit CLI-level overrides."""
     updates: dict[str, Any] = {}
@@ -98,6 +115,10 @@ def settings_with_overrides(
         updates["tortus_embedding_provider"] = embedding_provider
     if embedding_model is not None:
         updates["tortus_embedding_model"] = embedding_model
+    if extraction_provider is not None:
+        updates["tortus_extraction_provider"] = extraction_provider
+    if synthesis_provider is not None:
+        updates["tortus_synthesis_provider"] = synthesis_provider
     return settings.model_copy(update=updates)
 
 
@@ -113,7 +134,7 @@ def project_config_path(start: Path | None = None) -> Path | None:
 
 def project_config_values(path: Path | None) -> dict[str, Any]:
     """Load recognized Tortus settings from a project config file."""
-    if path is None:
+    if path is None or not path.exists():
         return {}
     payload = tomllib.loads(path.read_text(encoding="utf-8"))
     section = payload.get("tortus", payload)
@@ -155,7 +176,14 @@ def default_project_config() -> str:
             'cache_dir = ".tortus/cache"',
             'embedding_provider = "local"',
             'embedding_model = "text-embedding-3-large"',
+            'extraction_provider = "auto"',
+            'synthesis_provider = "auto"',
             'vector_backend = "exact"',
             "",
         ]
     )
+
+
+def user_config_values() -> dict[str, Any]:
+    """Return values configured in the per-user Tortus config."""
+    return project_config_values(USER_CONFIG_PATH)

@@ -1,8 +1,8 @@
 # Tortus: Toroidal Semantic Graph Retrieval
 
-![Tortus dashboard demo](assets/tortus-dashboard-demo.gif)
+![Tortus demo terminal output](assets/tortus-demo-terminal.svg)
 
-Tortus is a design-stage retrieval architecture for explainable, multi-hop RAG over large and federated knowledge bases.
+Tortus is a local-first retrieval system for explainable, multi-hop RAG over large and federated knowledge bases.
 
 The core idea is simple: instead of treating knowledge as a flat set of embedded chunks, Tortus models it as a typed semantic graph embedded onto a soft toroidal manifold. Queries start with vector retrieval, then traverse concept edges, cross domain portals when needed, and return both an answer and the path that produced it.
 
@@ -10,11 +10,21 @@ The bet: topology-aware traversal can improve multi-hop retrieval without turnin
 
 > Query concepts, not just chunks. Return reasoning paths, not just citations.
 
+## Painful Problem
+
+The hard part of internal knowledge work is often not finding a relevant document. It is figuring out how several relevant documents connect.
+
+In an incident review, for example, the evidence might be split across an auth migration note, a gateway retry runbook, an observability guide, and the incident timeline. Search can find each fragment. A normal RAG answer can summarize the retrieved text. The painful part is still left to the user:
+
+> Which evidence explains what actually happened, and what path connects the facts?
+
+Tortus is built for that gap. It tries to answer "why did this happen?" or "what should we fix?" by returning the evidence path across documents, not only a list of matching chunks.
+
 ## Status
 
 This repository now contains an executable V2 slice: a Python distribution named `tortus-rag`, an importable `tortus` package, a `tortus` console command, project-local document ingestion, pinned source snapshots, typed graph schemas, SQLite persistence, local embedding fallback, exact vector search, optional FAISS indexing, source-backed answer synthesis, typed retrieval traces, GraphQL plus `/api/query`, a diagnostic dashboard, local and optional external baseline adapters, audit workflows, package/release checks, CI, and reproducible benchmark reports.
 
-The implementation is still early. The intended MVP remains a local prototype that validates whether toroidal graph locality plus typed traversal improves multi-hop retrieval quality, explainability, and shard affinity compared with vector-only RAG, hybrid sparse+dense retrieval, and local approximations of GraphRAG-style and agentic retrieval. The current baselines are useful engineering controls, not claims that Tortus has beaten every external GraphRAG implementation.
+The implementation is still early. The intended MVP remains a local prototype that tests whether toroidal graph locality plus typed traversal improves multi-hop retrieval quality, explainability, and shard affinity compared with vector-only RAG, hybrid sparse+dense retrieval, and local approximations of GraphRAG-style and agentic retrieval. The current baselines are useful engineering controls, not claims that Tortus has beaten every external GraphRAG implementation.
 
 Current evidence strength is prototype-level. The benchmark numbers below are useful for checking whether the architecture and evaluation harness behave coherently, but they are not yet a research claim about real-world retrieval superiority.
 
@@ -31,19 +41,28 @@ Current evidence strength is prototype-level. The benchmark numbers below are us
 
 Tortus installs as the `tortus-rag` distribution and exposes the `tortus` command.
 
+Requires Python 3.12+. Check your interpreter first:
+
+```bash
+python --version
+```
+
 ```bash
 pip install tortus-rag
 ```
 
-For PDF, HTML, and URL ingestion, install the ingestion extra:
-```bash
-pip install "tortus-rag[ingest]"
-```
+The base install includes Markdown, text, HTML, PDF, folder, and URL ingestion.
 
 For benchmark baselines, install the baseline extra:
 
 ```bash
 pip install "tortus-rag[baselines]"
+```
+
+The dashboard/API server is optional:
+
+```bash
+pip install "tortus-rag[api]"
 ```
 
 From a cloned repo, use the project virtualenv command form shown below:
@@ -61,6 +80,50 @@ tortus doctor
 `doctor` checks the installed package, dashboard assets, optional dependencies, and active data path.
 
 ## Quickstart
+
+### One-Command Solve Flow
+
+Install Tortus, point it at your own docs, and ask the question you actually need answered:
+
+```bash
+pip install tortus-rag
+tortus solve "Why did this incident happen, and what should we fix?" ./docs https://example.com/runbook
+```
+
+`tortus solve` creates a hidden local project under `~/.tortus/projects/`, snapshots the supplied files/folders/URLs, builds the graph and vector index, traverses the evidence path, and returns:
+
+- a cited diagnosis
+- the likely root-cause/evidence path
+- recommended next actions
+- missing-evidence warnings
+- source-health checks for unsupported, empty, duplicate, or weak documents
+
+If you have an OpenAI or Azure OpenAI key, configure it once:
+
+```bash
+tortus setup --provider openai
+```
+
+Keys are stored in `~/.tortus/config.toml`, outside the repo. Without a key, Tortus still runs with deterministic local extraction and synthesis, but it labels the result as lower-quality local mode.
+
+Try the packaged demo from any directory:
+
+```bash
+tortus demo
+```
+
+Write a ticket-ready Markdown report:
+
+```bash
+tortus solve "Why did this incident happen, and what should we fix?" ./docs --output report.md
+```
+
+Open the most recent solve in the dashboard:
+
+```bash
+pip install "tortus-rag[api]"
+tortus open --last
+```
 
 ### Fast Demo From Any Directory
 
@@ -107,7 +170,7 @@ What each step does:
 | Build retrieval graph | `tortus index` | Builds nodes, edges, embeddings, and vector index. |
 | Ask a question | `tortus query "..." --explain` | Returns answer, evidence, confidence, and hops. |
 
-Supported local file types are `.md`, `.mdx`, `.txt`, `.html`, `.htm`, and `.pdf`. URLs are supported when the `ingest` extra is installed:
+Supported local file types are `.md`, `.mdx`, `.txt`, `.html`, `.htm`, and `.pdf`. URLs work from the base install:
 
 ```bash
 tortus ingest ./docs https://example.com/post --refresh
@@ -118,6 +181,7 @@ tortus ingest ./docs https://example.com/post --refresh
 After `ingest` and `index`, start the diagnostic workbench:
 
 ```bash
+pip install "tortus-rag[api]"
 tortus serve --port 8010
 ```
 

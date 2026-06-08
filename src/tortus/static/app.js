@@ -188,6 +188,17 @@ async function runQuery() {
 function renderAnswer(result) {
   document.getElementById("warnings").textContent = result.warnings.join(" ");
   document.getElementById("answer").textContent = result.answer;
+  document.getElementById("diagnosis").textContent = result.diagnosis || result.answer;
+  document.getElementById("quality-mode").textContent = result.quality_mode || "unknown quality";
+  document.getElementById("action-list").innerHTML = (result.recommended_actions || []).length
+    ? result.recommended_actions
+        .map((action) => `<li>${escapeHtml(action)}</li>`)
+        .join("")
+    : "<li>No recommended actions were generated.</li>";
+  document.getElementById("missing-evidence").textContent = (result.missing_evidence || []).join(
+    " ",
+  );
+  renderSourceHealth(result.source_health || {});
   const budget = result.budget;
   document.getElementById("budget").innerHTML = [
     ["confidence", formatNumber(result.confidence)],
@@ -241,6 +252,31 @@ function renderAnswer(result) {
     )
     .join("");
   renderTrace(result.trace || {});
+}
+
+function renderSourceHealth(health) {
+  const sourceTypes = Object.entries(health.source_types || {})
+    .map(([key, value]) => `${key}:${value}`)
+    .join(", ");
+  document.getElementById("source-health").innerHTML = [
+    ["quality", formatNumber(health.quality_score || 0)],
+    ["docs", health.documents || 0],
+    ["chunks", health.chunks || 0],
+    ["unsupported", health.unsupported_sources || 0],
+    ["empty", health.empty_documents || 0],
+    ["duplicates", health.duplicate_documents || 0],
+    ["types", sourceTypes || "unknown"],
+    ["warnings", (health.warnings || []).length],
+  ]
+    .map(
+      ([label, value]) => `
+        <div class="metric compact">
+          <strong>${escapeHtml(value)}</strong>
+          <span>${escapeHtml(label)}</span>
+        </div>
+      `,
+    )
+    .join("");
 }
 
 function renderTrace(trace) {

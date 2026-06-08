@@ -252,15 +252,36 @@ class BaselineComparison(BaseModel):
     latency_ms: float
 
 
+class SourceHealth(BaseModel):
+    """Summary of source quality and ingestion risks for the active project."""
+
+    documents: int = 0
+    chunks: int = 0
+    supported_sources: int = 0
+    unsupported_sources: int = 0
+    empty_documents: int = 0
+    duplicate_documents: int = 0
+    warnings: list[str] = Field(default_factory=list)
+    source_types: dict[str, int] = Field(default_factory=dict)
+    quality_score: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
 class AnswerResult(BaseModel):
     """The final synthesized response and reasoning trace provided to the caller."""
 
     answer: str
+    diagnosis: str = ""
+    root_cause_path: list[str] = Field(default_factory=list)
+    recommended_actions: list[str] = Field(default_factory=list)
+    missing_evidence: list[str] = Field(default_factory=list)
+    quality_mode: str = "deterministic-local"
+    citations: list[EvidenceSpan] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning_path: list[ReasoningHop] = Field(default_factory=list)
     evidence: list[EvidenceSpan] = Field(default_factory=list)
     budget: BudgetStats
     warnings: list[str] = Field(default_factory=list)
     baseline_comparison: list[BaselineComparison] = Field(default_factory=list)
+    source_health: SourceHealth = Field(default_factory=SourceHealth)
     trace: RetrievalTrace = Field(default_factory=RetrievalTrace)
     diagnostics: dict[str, Any] = Field(default_factory=dict)

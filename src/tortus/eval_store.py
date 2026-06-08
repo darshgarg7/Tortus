@@ -4,8 +4,6 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-import duckdb
-
 from .eval import EvalReport
 
 
@@ -17,6 +15,14 @@ def write_eval_json(report: EvalReport, path: Path) -> None:
 
 def write_eval_duckdb(report: EvalReport, path: Path) -> str:
     """Persist an evaluation report to a DuckDB results database."""
+    try:
+        import duckdb
+    except ImportError as exc:
+        raise RuntimeError(
+            "DuckDB eval export requires the optional eval extra. "
+            'Install with: pip install "tortus-rag[eval]"'
+        ) from exc
+
     path.parent.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%S%fZ")
     with duckdb.connect(str(path)) as connection:
