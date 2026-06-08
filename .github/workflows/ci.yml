@@ -43,7 +43,8 @@ jobs:
         run: |
           python -m venv /tmp/tortus-wheel-smoke
           /tmp/tortus-wheel-smoke/bin/python -m pip install --upgrade pip
-          /tmp/tortus-wheel-smoke/bin/python -m pip install dist/tortus_rag-*.whl
+          WHEEL="$(ls dist/tortus_rag-*.whl)"
+          /tmp/tortus-wheel-smoke/bin/python -m pip install "$WHEEL[api]"
           /tmp/tortus-wheel-smoke/bin/python -c "import tortus; print(tortus.__version__)"
           TORTUS_DATA_DIR=/tmp/tortus-data TORTUS_CACHE_DIR=/tmp/tortus-cache /tmp/tortus-wheel-smoke/bin/tortus --help
           TORTUS_DATA_DIR=/tmp/tortus-data TORTUS_CACHE_DIR=/tmp/tortus-cache /tmp/tortus-wheel-smoke/bin/tortus ingest --corpus engineering
