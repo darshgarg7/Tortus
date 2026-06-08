@@ -49,9 +49,11 @@ class LLMChunkGraph(BaseModel):
 def extract_graph_with_settings(
     chunks: list[Chunk],
     settings: Settings,
+    *,
+    max_edges_per_phrase: int | None = None,
 ) -> tuple[list[ConceptNode], list[SemanticEdge]]:
     """Extract a graph, adding cached LLM concepts when configured."""
-    nodes, edges = extract_graph(chunks)
+    nodes, edges = extract_graph(chunks, max_edges_per_phrase=max_edges_per_phrase)
     provider = build_llm_provider(settings) if provider_allowed(settings, "extraction") else None
     if provider is None:
         for node in nodes:

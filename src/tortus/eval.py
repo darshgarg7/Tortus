@@ -263,6 +263,90 @@ NEGATIVE_QUESTIONS = (
     ),
 )
 
+SCALE_SWEEP_QUESTIONS = (
+    EvalQuestion(
+        id="scale-kubernetes-token-projection",
+        suite="scale_sweep",
+        question=(
+            "How do Kubernetes service account token projection and projected volumes "
+            "relate to audience validation?"
+        ),
+        expected_terms=("service", "account", "token", "audience"),
+        expected_sources=(
+            "https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/",
+            "https://kubernetes.io/docs/concepts/storage/projected-volumes/",
+        ),
+        expected_edge_types=("portal", "related_to"),
+    ),
+    EvalQuestion(
+        id="scale-trace-context-retry",
+        suite="scale_sweep",
+        question="Why does traceparent preservation matter when gateways retry requests?",
+        expected_terms=("traceparent", "retry", "gateway", "propagation"),
+        expected_sources=(
+            "https://www.w3.org/TR/trace-context/",
+            "https://www.rfc-editor.org/rfc/rfc9110",
+        ),
+        expected_edge_types=("portal", "related_to"),
+    ),
+    EvalQuestion(
+        id="scale-sre-retry-observability",
+        suite="scale_sweep",
+        question=(
+            "Which public reliability guidance connects retry behavior, monitoring, "
+            "and incident diagnosis?"
+        ),
+        expected_terms=("retry", "monitoring", "incident", "observability"),
+        expected_sources=(
+            "https://sre.google/sre-book/monitoring-distributed-systems/",
+            "https://www.rfc-editor.org/rfc/rfc9110",
+        ),
+        expected_edge_types=("portal",),
+    ),
+    EvalQuestion(
+        id="scale-problem-details-auth-errors",
+        suite="scale_sweep",
+        question=(
+            "How can problem details help connect authentication errors with trace "
+            "identifiers?"
+        ),
+        expected_terms=("problem", "details", "authentication", "trace"),
+        expected_sources=(
+            "https://www.rfc-editor.org/rfc/rfc7807",
+            "https://www.w3.org/TR/trace-context/",
+        ),
+        expected_edge_types=("portal", "related_to"),
+    ),
+    EvalQuestion(
+        id="scale-sidecar-vs-auth-rollout",
+        suite="scale_sweep",
+        question=(
+            "Why should sidecar lifecycle symptoms be separated from token audience "
+            "rollout failures?"
+        ),
+        expected_terms=("sidecar", "token", "audience", "rollout"),
+        expected_sources=(
+            "https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/",
+            "https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/",
+        ),
+        expected_edge_types=("portal",),
+    ),
+    EvalQuestion(
+        id="scale-baggage-policy-boundary",
+        suite="scale_sweep",
+        question=(
+            "What is the relationship between baggage propagation and clear gateway "
+            "propagation policy?"
+        ),
+        expected_terms=("baggage", "propagation", "gateway", "policy"),
+        expected_sources=(
+            "https://opentelemetry.io/docs/concepts/signals/baggage/",
+            "https://opentelemetry.io/docs/specs/otel/context/",
+        ),
+        expected_edge_types=("related_to",),
+    ),
+)
+
 
 class EvalRow(BaseModel):
     """Scored result row for one question and strategy."""
@@ -519,6 +603,8 @@ def questions_for_suite(suite: str) -> tuple[EvalQuestion, ...]:
         return STRESS_QUESTIONS
     if suite == "negative":
         return NEGATIVE_QUESTIONS
+    if suite == "scale_sweep":
+        return SCALE_SWEEP_QUESTIONS
     if suite == "golden100":
         return load_json_questions(Path("data/golden_set.json"))
     if suite == "full":

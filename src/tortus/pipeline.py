@@ -48,12 +48,21 @@ def ingest_sources(
     return ingest_workspace(settings, sources, manifest=manifest, refresh=refresh)
 
 
-def build_index(settings: Settings, corpus: str | None = None) -> dict[str, int]:
+def build_index(
+    settings: Settings,
+    corpus: str | None = None,
+    *,
+    max_edges_per_phrase: int | None = None,
+) -> dict[str, int]:
     """Build the graph store and vector index for the selected corpus."""
     corpus = corpus or settings.tortus_corpus
     documents = load_documents(settings, corpus)
     chunks = chunk_corpus(documents)
-    nodes, edges = extract_graph_with_settings(chunks, settings)
+    nodes, edges = extract_graph_with_settings(
+        chunks,
+        settings,
+        max_edges_per_phrase=max_edges_per_phrase,
+    )
     embeddings = build_embedding_provider(settings)
     node_vectors = embeddings.embed([node.label + "\n" + node.text for node in nodes])
     nodes = assign_torus(nodes, node_vectors)
