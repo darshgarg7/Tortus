@@ -17,11 +17,16 @@ build/
 data/*
 !data/.gitkeep
 !data/golden_set.json
+!data/eval/
+data/eval/*
+!data/eval/scale-sweep.json
 !data/benchmark_snapshots/
 !data/benchmark_snapshots/*.json
 !data/audits/
 !data/audits/*.jsonl
 !data/reports/
+data/reports/*
 !data/reports/eval-report.md
+!data/reports/scale-sweep-report.md
 .tortus_cache/
 .tortus/

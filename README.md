@@ -27,7 +27,7 @@ This repository now contains an executable V2 slice: a Python distribution named
 
 The implementation is still early. The intended MVP remains a local prototype that tests whether toroidal graph locality plus typed traversal improves multi-hop retrieval quality, explainability, and shard affinity compared with vector-only RAG, hybrid sparse+dense retrieval, and local approximations of GraphRAG-style and agentic retrieval. The current baselines are useful engineering controls, not claims that Tortus has beaten every external GraphRAG implementation.
 
-Current evidence strength is prototype-level. The benchmark numbers below are useful for checking whether the architecture and evaluation harness behave coherently, but they are not yet a research claim about real-world retrieval superiority.
+Current evidence strength is prototype-level but improving. The benchmark numbers below are useful for checking whether the architecture and evaluation harness behave coherently, including a 1,000-doclet public-source scale sweep, but they are not yet a research claim about real-world retrieval superiority.
 
 | Layer | Current state | Evidence implication | Hardening move |
 | --- | --- | --- | --- |
@@ -36,7 +36,22 @@ Current evidence strength is prototype-level. The benchmark numbers below are us
 | Extraction | Deterministic term and edge extraction. | Makes tests repeatable; does not test noisy LLM concept extraction. | Add schema-constrained LLM extraction, confidence calibration, retry handling, and human spot checks. |
 | Eval labels | Curated labels plus JSONL audit import that can override expected evidence URIs and path labels. Current committed audit rows are assistant-reviewed. | Reports can separate assistant-reviewed, human-reviewed, and pending rows instead of blending them. | Complete maintainer review before treating golden metrics as human-audited. |
 | Baselines | Local vector, BM25, hybrid, hybrid graph rerank, graph-local, layout, community-summary, bounded-agentic, real LlamaIndex Core retriever, and optional external command adapters. | Stronger controls; GraphRAG and LightRAG still need configured workspaces to become real comparisons. | Run GraphRAG and LightRAG adapters on the same snapshots. |
-| Scale | 118 V2 benchmark questions over a 25-node local graph. | Shows mechanics and failure modes; not enough statistical power. | Expand to audited multi-corpus evals with confidence intervals and failure taxonomy by query type. |
+| Scale | 118 V2 benchmark questions over a 25-node local graph, plus a 50/200/500/1000-doclet public-source scale sweep. | Shows scale mechanics and path-recall behavior beyond toy fixtures; labels are still heuristic and limited. | Expand to 100+ human-audited scale questions across multiple corpora with confidence intervals and failure taxonomy by query type. |
+
+## Benchmark Evidence
+
+The latest scale sweep is available at [`data/reports/scale-sweep-report.md`](data/reports/scale-sweep-report.md), with raw JSON at [`data/eval/scale-sweep.json`](data/eval/scale-sweep.json). It uses 10 public engineering sources from Kubernetes, OpenTelemetry, W3C, RFCs, and the Google SRE book, split into source-preserving doclets at 50, 200, 500, and 1000 documents.
+
+At the 1000-doclet point, graph-aware strategies recovered labeled path structure that rank-only baselines did not:
+
+| Strategy at 1000 docs | Pass | Source recall | Path recall | p95 retrieval |
+| --- | ---: | ---: | ---: | ---: |
+| `hybrid_graph_rerank_local` | 1.00 | 0.75 | 1.00 | 92.5 ms |
+| `tortus_torus` | 0.83 | 0.75 | 0.83 | 162.2 ms |
+| `vector_only_local` | 0.00 | 0.83 | 0.00 | 19.0 ms |
+| `bm25_local` | 0.00 | 0.67 | 0.00 | 98.9 ms |
+
+The honest read: this does not prove that toroidal retrieval beats every graph retrieval method. It does show the product thesis under stress: when the task requires an evidence path, returning only ranked chunks is insufficient, and bounded graph traversal can recover cross-source reasoning paths with measurable latency trade-offs.
 
 ## Installation
 
@@ -251,6 +266,17 @@ The eval command prints a compact strategy summary by default. Add `--rows` if y
 
 ```bash
 .venv/bin/tortus eval --suite smoke --strategies tortus_torus,vector_only_local --rows
+```
+
+Run the public-source scale sweep that backs the benchmark evidence table:
+
+```bash
+.venv/bin/python scripts/run_scale_sweep.py \
+  --fetch \
+  --sizes 50,200,500,1000 \
+  --strategies tortus_torus,vector_only_local,bm25_local,hybrid_dense_bm25_local,hybrid_graph_rerank_local \
+  --json-out data/eval/scale-sweep.json \
+  --report-out data/reports/scale-sweep-report.md
 ```
 
 ### Developer Checks

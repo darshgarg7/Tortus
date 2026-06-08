@@ -103,9 +103,11 @@ include = [
   ".env.example",
   "assets/**",
   "data/golden_set.json",
+  "data/eval/scale-sweep.json",
   "data/audits/*.jsonl",
   "data/benchmark_snapshots/*.json",
   "data/reports/eval-report.md",
+  "data/reports/scale-sweep-report.md",
   "docs/**",
   "examples/**",
   "scripts/**"
