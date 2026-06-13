@@ -3,6 +3,8 @@
 ![Tortus demo terminal output](assets/tortus-demo-terminal.svg)
 ![Tortus dashboard demo](assets/tortus-dashboard-demo.gif)
 
+https://tortus.lovable.app/
+
 Tortus is a local-first retrieval system for explainable, multi-hop RAG over large and federated knowledge bases.
 
 The core idea is simple: instead of treating knowledge as a flat set of embedded chunks, Tortus models it as a typed semantic graph embedded onto a soft toroidal manifold. Queries start with vector retrieval, then traverse concept edges, cross domain portals when needed, and return both an answer and the path that produced it.
