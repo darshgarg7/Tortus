@@ -1,3 +1,5 @@
+import json
+
 from tortus.config import Settings
 from tortus.ingest import (
     WorkspaceIngestResult,
@@ -77,7 +79,7 @@ def test_manifest_and_pdf_warning_path(tmp_path) -> None:
     manifest = tmp_path / "sources.toml"
     note = tmp_path / "note.txt"
     note.write_text("Trace context survives retries.", encoding="utf-8")
-    manifest.write_text(f'sources = ["{note}"]\n', encoding="utf-8")
+    manifest.write_text(f"sources = [{json.dumps(str(note))}]\n", encoding="utf-8")
     settings = Settings(TORTUS_DATA_DIR=tmp_path / "data", TORTUS_CACHE_DIR=tmp_path / "cache")
 
     result = ingest_workspace(settings, [], manifest=manifest, refresh=False)
