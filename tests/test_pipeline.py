@@ -1,7 +1,9 @@
+import json
+
 from tortus.config import Settings
 from tortus.eval import questions_for_suite, run_eval, run_smoke_eval
 from tortus.models import TraversalPolicy
-from tortus.pipeline import build_index, ingest_builtin, load_engine
+from tortus.pipeline import build_index, data_paths, ingest_builtin, load_engine
 
 
 def test_ingest_index_query_eval_roundtrip(tmp_path) -> None:
@@ -65,3 +67,24 @@ def test_packaged_acme_demo_runs_without_workspace_files(tmp_path, monkeypatch) 
     assert "traceparent" in evidence_text
     assert "audience" in evidence_text
     assert result.reasoning_path
+
+
+def test_load_engine_rebuilds_when_corpus_snapshot_changes(tmp_path) -> None:
+    settings = Settings(TORTUS_DATA_DIR=tmp_path / "data", TORTUS_CACHE_DIR=tmp_path / "cache")
+    ingest_builtin(settings)
+    build_index(settings)
+    paths = data_paths(settings)
+    original_metadata = json.loads(paths["build_metadata"].read_text(encoding="utf-8"))
+
+    documents_path = paths["corpus"] / "documents.json"
+    documents = json.loads(documents_path.read_text(encoding="utf-8"))
+    documents[0]["text"] += " Fresh rebuild sentinel term."
+    documents_path.write_text(json.dumps(documents), encoding="utf-8")
+
+    engine = load_engine(settings)
+    try:
+        rebuilt_metadata = json.loads(paths["build_metadata"].read_text(encoding="utf-8"))
+    finally:
+        engine.graph.close()
+
+    assert rebuilt_metadata["documents_fingerprint"] != original_metadata["documents_fingerprint"]
